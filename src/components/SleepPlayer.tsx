@@ -25,38 +25,39 @@ interface SleepPlayerProps {
   activeTrackId: string;
   setActiveTrackId: (id: string) => void;
   onNavigateToTab: (tab: 'player' | 'canvas' | 'mixer') => void;
+  isDark?: boolean;
 }
 
 // Predefined relax ambient soundtracks
 const PRELOADED_SLEEP_TRACKS: SavedTrack[] = [
   {
     id: 'track-default-resonance',
-    name: 'Cosmic Singularity (宇宙振鸣)',
+    name: '西藏禅意颂钵',
     sounds: { 'bowl': 0.8, 'wind': 0.3 }
   },
   {
     id: 'track-default-rainstorm',
-    name: 'Rainforest Whispers (深夜雨林)',
+    name: '深夜林间微雨',
     sounds: { 'rain': 0.9, 'thunder': 0.3, 'ocean': 0.2 }
   },
   {
     id: 'track-default-tides',
-    name: 'Eternal Tide Swell (永恒潮汐)',
+    name: '永恒海浪潮汐',
     sounds: { 'ocean': 0.9, 'wind': 0.2, 'bowl': 0.15 }
   },
   {
     id: 'track-default-zen',
-    name: 'Mountain Zen Gate (空山禅意)',
+    name: '空山温暖壁炉',
     sounds: { 'bowl': 0.95, 'crackle': 0.25, 'wind': 0.3 }
   }
 ];
 
-export const DEFAULT_MANDALA_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500"><rect width="100%" height="100%" fill="%23171717"/><g transform="translate(250,250)" stroke="rgba(255,110,0,0.35)" stroke-width="2" fill="none"><circle r="40"/><circle r="80"/><circle r="120"/><circle r="180"/>${Array.from({ length: 48 }).map((_, i) => {
+export const DEFAULT_MANDALA_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500"><rect width="100%" height="100%" fill="%23FAF6F0"/><g transform="translate(250,250)" stroke="rgba(197,168,128,0.35)" stroke-width="2" fill="none"><circle r="40"/><circle r="80"/><circle r="120"/><circle r="180"/>${Array.from({ length: 48 }).map((_, i) => {
   const angle = (i * 360) / 48;
   return `<line x1="0" y1="0" x2="${Math.cos(angle * Math.PI / 180) * 220}" y2="${Math.sin(angle * Math.PI / 180) * 220}" opacity="0.3" />`;
 }).join('')}${Array.from({ length: 12 }).map((_, i) => {
   const angle = (i * 360) / 12;
-  return `<g transform="rotate(${angle})"><path d="M 0,-40 C 30,-80 30,-120 0,-160 C -30,-120 -30,-80 0,-40" stroke="rgba(255,255,255,0.15)" /><path d="M 0,0 C 15,-20 15,-40 0,-60 C -15,-40 -15,-20 0,0" stroke="rgba(255,180,0,0.3)" /><circle cx="0" cy="-160" r="4" fill="%23ff6e00"/></g>`;
+  return `<g transform="rotate(${angle})"><path d="M 0,-40 C 30,-80 30,-120 0,-160 C -30,-120 -30,-80 0,-40" stroke="rgba(197,168,128,0.15)" /><path d="M 0,0 C 15,-20 15,-40 0,-60 C -15,-40 -15,-20 0,0" stroke="rgba(180,140,80,0.3)" /><circle cx="0" cy="-160" r="4" fill="%23c5a880"/></g>`;
 }).join('')}</g></svg>`;
 
 const SleepPlayer: React.FC<SleepPlayerProps> = ({
@@ -64,11 +65,13 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
   savedTracks,
   activeTrackId,
   setActiveTrackId,
-  onNavigateToTab
+  onNavigateToTab,
+  isDark = false
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [timerLeft, setTimerLeft] = useState<number | null>(null); // clock countdown in seconds
   const [timerConfig, setTimerConfig] = useState<number | null>(null); // minutes
+  const [customMinutes, setCustomMinutes] = useState<string>('');
   const [selectedMandalaId, setSelectedMandalaId] = useState<string>('default');
   const [animationMode, setAnimationMode] = useState<AnimationMode>('nested-zoom');
   const [breathingGuide, setBreathingGuide] = useState(false);
@@ -398,41 +401,61 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
     <div className="w-full h-full flex flex-col items-center justify-center p-2 xl:p-4 overflow-y-auto">
       
       {/* Standalone Physical styled CD Deck Container */}
-      <div className="w-full max-w-[530px] bg-gradient-to-b from-[#161211] via-[#0b0808] to-[#040303] border border-white/10 rounded-[38px] p-6 shadow-2xl flex flex-col items-center relative overflow-hidden">
+      <div className={`w-full max-w-[530px] border rounded-[38px] p-6 shadow-md flex flex-col items-center relative overflow-hidden transition-colors duration-300 ${
+        isDark 
+          ? 'bg-stone-900/90 border-stone-850 text-stone-100 shadow-xl shadow-black/40' 
+          : 'bg-white border-stone-200/80 text-stone-800 shadow-sm'
+      }`}>
         
         {/* Subtle decorative metallic side rails for high-end feel */}
-        <div className="absolute top-8 left-0 bottom-8 w-[2px] bg-gradient-to-b from-transparent via-white/10 to-transparent pointer-events-none" />
-        <div className="absolute top-8 right-0 bottom-8 w-[2px] bg-gradient-to-b from-transparent via-white/10 to-transparent pointer-events-none" />
+        <div className={`absolute top-8 left-0 bottom-8 w-[2px] bg-gradient-to-b from-transparent to-transparent pointer-events-none ${
+          isDark ? 'via-stone-800' : 'via-stone-100'
+        }`} />
+        <div className={`absolute top-8 right-0 bottom-8 w-[2px] bg-gradient-to-b from-transparent to-transparent pointer-events-none ${
+          isDark ? 'via-stone-800' : 'via-stone-100'
+        }`} />
 
-        {/* 1. UPPER SECTION: The Premium CD Compartment Door (像一个CD机一样，里面放图片) */}
-        <div className="relative w-full aspect-square max-w-[420px] rounded-full bg-[#1c1817] p-3 shadow-[0_0_35px_rgba(0,0,0,0.8),inset_0_2px_4px_rgba(255,255,255,0.05)] border border-white/5 flex items-center justify-center group mb-6">
+        {/* 1. UPPER SECTION: The Premium CD Compartment Door */}
+        <div className={`relative w-full aspect-square max-w-[420px] rounded-full p-3 shadow-inner border flex items-center justify-center group mb-6 transition-colors duration-300 ${
+          isDark ? 'bg-stone-950 border-stone-850' : 'bg-stone-50 border-stone-200'
+        }`}>
           
           {/* Acrylic Glass cover reflection shine overlay */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white/2 to-white/5 pointer-events-none z-20 mix-blend-overlay" />
+          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none z-20 mix-blend-overlay" />
           
           {/* Outer Chrome CD drive ring line */}
-          <div className="absolute inset-1 rounded-full border border-orange-500/10 pointer-events-none z-10" />
+          <div className="absolute inset-1 rounded-full border border-amber-500/10 pointer-events-none z-10" />
 
           {/* Sunk interior track mechanism background */}
-          <div className="absolute inset-4 rounded-full bg-neutral-950/80 pointer-events-none" />
+          <div className={`absolute inset-4 rounded-full pointer-events-none transition-colors ${
+            isDark ? 'bg-stone-900/40' : 'bg-stone-100/50'
+          }`} />
           
           {/* Subtle Laser pickup arm track decoration underneath the disc */}
-          <div className="absolute left-1/2 top-4 bottom-1/2 w-1 bg-gradient-to-b from-neutral-800 to-transparent -translate-x-1/2 opacity-30 pointer-events-none" />
-          <div className="absolute left-[54%] top-[25%] w-1.5 h-1.5 rounded-full bg-blue-500/40 shadow-[0_0_6px_rgba(59,130,246,1)] pointer-events-none" />
+          <div className="absolute left-1/2 top-4 bottom-1/2 w-1 bg-gradient-to-b from-stone-200 to-transparent -translate-x-1/2 opacity-30 pointer-events-none" />
+          <div className="absolute left-[54%] top-[25%] w-1.5 h-1.5 rounded-full bg-amber-500/40 shadow-sm pointer-events-none" />
 
           {/* Rotating CD Disc Core - Spins when isPlaying is true and not tunnel zoom */}
           <motion.div
             animate={isPlaying && animationMode !== 'nested-zoom' ? { rotate: 360 } : { rotate: 0 }}
             transition={isPlaying && animationMode !== 'nested-zoom' ? { repeat: Infinity, duration: 18, ease: "linear" } : { duration: 0.5 }}
-            className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-neutral-900 border border-white/10 shadow-inner z-10"
+            className={`relative w-full h-full rounded-full overflow-hidden flex items-center justify-center border shadow-inner z-10 transition-colors duration-300 ${
+              isDark ? 'bg-stone-950 border-stone-850' : 'bg-stone-50 border-stone-200'
+            }`}
           >
             {/* Embedded Mandala Live Canvas */}
             <canvas ref={playerCanvasRef} className="absolute inset-0 block pointer-events-none w-full h-full" />
             
             {/* Standard CD inner hub silver ring groove decoration */}
-            <div className="absolute w-[130px] h-[130px] rounded-full border border-white/15 bg-neutral-900/35 backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-15">
-              <div className="w-[100px] h-[100px] rounded-full border border-dashed border-white/20 flex items-center justify-center">
-                <div className="w-[58px] h-[58px] rounded-full bg-neutral-950/40 border border-white/10" />
+            <div className={`absolute w-[130px] h-[130px] rounded-full border backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-15 transition-colors ${
+              isDark ? 'border-stone-800 bg-stone-900/50' : 'border-stone-200 bg-white/50'
+            }`}>
+              <div className={`w-[100px] h-[100px] rounded-full border border-dashed flex items-center justify-center ${
+                isDark ? 'border-stone-700' : 'border-stone-200'
+              }`}>
+                <div className={`w-[58px] h-[58px] rounded-full border ${
+                  isDark ? 'bg-stone-950 border-stone-800/50' : 'bg-stone-100 border-stone-200/50'
+                }`} />
               </div>
             </div>
           </motion.div>
@@ -440,12 +463,19 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
           {/* The Magnetic Center Spindle lock cap (CD机中心的固定卡轴水晶柱 - Click to Toggle Mode) */}
           <button
             onClick={cycleMode}
-            title="点击切换模式 (绚丽嵌套缩放 / 静态背景 / 呼吸引导)"
-            className="absolute w-14 h-14 rounded-full bg-gradient-to-r from-neutral-300 via-neutral-100 to-neutral-400 border border-white/50 hover:border-orange-500 hover:scale-105 shadow-md flex items-center justify-center z-35 cursor-pointer active:scale-95 transition-all group"
+            className={`absolute w-14 h-14 rounded-full border hover:border-amber-500 hover:scale-105 shadow-sm flex items-center justify-center z-35 cursor-pointer active:scale-95 transition-all group ${
+              isDark 
+                ? 'bg-gradient-to-r from-stone-850 via-stone-800 to-stone-900 border-stone-700' 
+                : 'bg-gradient-to-r from-stone-100 via-stone-50 to-stone-200 border-stone-300'
+            }`}
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-neutral-700 to-neutral-500 flex items-center justify-center shadow-inner relative">
-              <div className="w-4 h-4 rounded-full bg-black shadow-md flex items-center justify-center">
-                <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-ping" />
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-inner relative ${
+              isDark ? 'bg-gradient-to-tr from-stone-800 to-stone-700' : 'bg-gradient-to-tr from-stone-200 to-stone-100'
+            }`}>
+              <div className={`w-4 h-4 rounded-full shadow-sm flex items-center justify-center ${
+                isDark ? 'bg-stone-900' : 'bg-stone-300'
+              }`}>
+                <span className="w-1.5 h-1.5 bg-amber-600 rounded-full animate-ping" />
               </div>
             </div>
           </button>
@@ -457,68 +487,97 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-[10px] rounded-full bg-neutral-950/85 flex flex-col items-center justify-center backdrop-blur-md transition-all z-20"
+                className={`absolute inset-[10px] rounded-full flex flex-col items-center justify-between py-7 backdrop-blur-sm transition-colors duration-300 z-20 ${
+                  isDark ? 'bg-stone-950/95' : 'bg-stone-50/95'
+                }`}
               >
-                <div className="mt-4 flex flex-col items-center">
+                {/* 1. TOP SECTION: Guiding label outside the circle */}
+                <div className="text-center z-10 select-none mt-2">
+                  <span className={`text-lg sm:text-xl font-extrabold tracking-[0.25em] px-5 py-2 rounded-2xl shadow-sm border transition-all inline-block ${
+                    breathingPhase === 'Inhale' 
+                      ? isDark ? 'bg-amber-955/40 border-amber-900/50 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-800'
+                      : breathingPhase === 'Hold' 
+                      ? isDark ? 'bg-indigo-955/40 border-indigo-900/50 text-indigo-400' : 'bg-indigo-50 border-indigo-200 text-indigo-805'
+                      : isDark ? 'bg-emerald-955/40 border-emerald-900/50 text-emerald-400' : 'bg-emerald-50 border-emerald-250/60 text-emerald-850'
+                  }`}>
+                    {breathingPhase === 'Inhale' ? '吸气' :
+                     breathingPhase === 'Hold' ? '屏气' :
+                     '呼气'}
+                  </span>
+                  <div className={`text-[10px] font-bold tracking-wider mt-2 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                    4秒 节奏引导
+                  </div>
+                </div>
+
+                {/* 2. MIDDLE SECTION: The dynamic pulsing circle (purely empty) */}
+                <div className="relative w-32 h-32 flex items-center justify-center select-none">
                   <motion.div
                     key={breathingPhase}
-                    initial={{ scale: breathingPhase === 'Inhale' ? 0.5 : 1.0, opacity: 0.5 }}
+                    initial={{ scale: breathingPhase === 'Inhale' ? 0.4 : 1.0, opacity: 0.3 }}
                     animate={{ 
-                      scale: breathingPhase === 'Inhale' ? 0.95 : breathingPhase === 'Hold' ? 0.95 : 0.5,
-                      opacity: 0.95
+                      scale: breathingPhase === 'Inhale' ? 0.95 : breathingPhase === 'Hold' ? 0.95 : 0.4,
+                      opacity: 0.8
                     }}
                     transition={{ duration: 4, ease: "easeInOut" }}
-                    className={`w-32 h-32 rounded-full flex flex-col items-center justify-center text-white border border-dashed ${
-                      breathingPhase === 'Inhale' ? 'bg-orange-500/20 border-orange-400 text-orange-200' :
-                      breathingPhase === 'Hold' ? 'bg-indigo-500/20 border-indigo-400 text-indigo-200' :
-                      'bg-emerald-500/20 border-emerald-400 text-emerald-200'
+                    className={`w-28 h-28 rounded-full border border-dashed transition-all duration-300 ${
+                      breathingPhase === 'Inhale' 
+                        ? isDark ? 'bg-amber-955/20 border-amber-500/80' : 'bg-amber-50/20 border-amber-305'
+                        : breathingPhase === 'Hold' 
+                        ? isDark ? 'bg-indigo-955/20 border-indigo-500/80' : 'bg-indigo-50/20 border-indigo-305'
+                        : isDark ? 'bg-emerald-955/20 border-emerald-500/80' : 'bg-emerald-50/20 border-emerald-305'
                     }`}
-                  >
-                    <span className="text-[14px] font-bold tracking-widest uppercase mb-0.5">
-                      {breathingPhase === 'Inhale' ? '吸气 Inhale' :
-                       breathingPhase === 'Hold' ? '屏气 Hold' :
-                       '呼气 Exhale'}
-                    </span>
-                    <span className="text-[9px] opacity-60 font-mono">4 Seconds</span>
-                  </motion.div>
+                  />
                 </div>
+
+                {/* 3. BOTTOM SECTION: Navigation control */}
                 <button 
                   onClick={cycleMode}
-                  className="mt-6 bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-full text-[9px] font-semibold text-white transition-all active:scale-95 border border-white/5"
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all active:scale-95 border z-10 ${
+                    isDark 
+                      ? 'bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700' 
+                      : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border-stone-200/50'
+                  }`}
                 >
-                  点击切换模式 (Next Mode)
+                  点击切换模式
                 </button>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* 2. LOWER SECTION: The Integrated Media Player Console (下面就是一个播放机，整个页面很简洁) */}
+        {/* 2. LOWER SECTION: The Integrated Media Player Console */}
         <div className="w-full flex flex-col gap-5 z-20">
 
           {/* LED Stereo Display Readout panel (Minimalist design) */}
-          <div className="relative bg-neutral-950 border border-white/5 rounded-2xl p-4 shadow-inner overflow-hidden text-center">
+          <div className={`relative rounded-2xl p-4 shadow-sm overflow-hidden text-center border transition-colors duration-300 ${
+            isDark ? 'bg-stone-950 border-stone-850' : 'bg-stone-50 border-stone-200'
+          }`}>
             
-            {/* LED Ambient Backlight shader effect */}
-            <div className="absolute inset-0 bg-gradient-to-b from-orange-500/2 via-transparent to-transparent pointer-events-none" />
-
-            <div className="flex justify-between items-center mb-1.5 text-[10px] text-white/40 font-bold uppercase tracking-wider">
-              <span className="text-orange-400 bg-orange-500/10 px-2.5 py-0.5 rounded-lg border border-orange-500/10">
+            <div className="flex justify-between items-center mb-1.5 text-[10px] font-bold uppercase tracking-wider">
+              <span className={`px-2.5 py-0.5 rounded-lg border transition-colors ${
+                isDark 
+                  ? 'text-amber-450 bg-amber-950/40 border-amber-900/60' 
+                  : 'text-amber-700 bg-amber-50 border-amber-250/50'
+              }`}>
                 {breathingGuide ? '助眠呼吸引导' : animationMode === 'nested-zoom' ? '绚丽嵌套缩放' : '静态背景'}
               </span>
-              <div className="flex items-center gap-1">
-                <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-orange-500 animate-pulse' : 'bg-neutral-800'}`} />
-                <span>{isPlaying ? '正在放音' : '待机中'}</span>
+              <div className={`flex items-center gap-1 transition-colors ${isDark ? 'text-stone-400' : 'text-stone-400'}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-amber-600 animate-pulse' : 'bg-stone-300'}`} />
+                <span>{isPlaying ? '放音中' : '待机中'}</span>
               </div>
             </div>
 
-            {/* Glowing amber digital display for track title */}
-            <h3 className="text-sm font-bold text-orange-400 tracking-wide font-sans truncate mb-1">
+             {/* Glowing amber digital display for track title */}
+            <h3 className={`text-sm font-bold tracking-wide font-sans truncate mb-1 transition-colors ${
+              isDark ? 'text-stone-100' : 'text-stone-800'
+            }`}>
               {activeTrack.name}
             </h3>
 
             {/* Sub-status scroll text displaying playing white noises */}
-            <div className="text-[10px] text-white/50 font-mono truncate">
+            <div className={`text-[10px] font-medium truncate transition-colors ${
+              isDark ? 'text-stone-400' : 'text-stone-500'
+            }`}>
               {Object.keys(activeTrack.sounds).map(id => {
                 const s = AVAILABLE_ASMR_SOUNDS.find(x => x.id === id);
                 return s ? s.name.split(' ')[0] : id;
@@ -526,54 +585,76 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             </div>
 
             {/* Time status countdown segment bar */}
-            <div className="mt-3 border-t border-white/5 pt-2 flex justify-center items-center text-[10px] font-mono text-white/50">
-              <span className="flex items-center gap-1 bg-white/2 px-2.5 py-0.5 rounded-full border border-white/5">
-                <Clock size={11} className="text-orange-400" />
-                <span>{timerLeft !== null ? formatTime(timerLeft) : '睡眠倒计时已关闭'}</span>
+            <div className={`mt-3 border-t pt-2 flex justify-center items-center text-[10px] font-mono transition-colors ${
+              isDark ? 'border-stone-850 text-stone-400' : 'border-stone-150 text-stone-500'
+            }`}>
+              <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full border transition-colors ${
+                isDark ? 'bg-stone-900 border-stone-800' : 'bg-stone-100 border-stone-200'
+              }`}>
+                <Clock size={11} className="text-amber-600" />
+                <span>{timerLeft !== null ? formatTime(timerLeft) : '未设置定时关机'}</span>
               </span>
             </div>
           </div>
 
           {/* Tactile Aluminum Playback Control deck */}
-          <div className="flex justify-center items-center gap-6 py-2 bg-neutral-900/50 rounded-2xl border border-white/5 px-4 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
+          <div className={`flex justify-center items-center gap-6 py-2 rounded-2xl border px-4 shadow-sm transition-colors ${
+            isDark ? 'bg-stone-950 border-stone-850' : 'bg-stone-50 border-stone-200'
+          }`}>
             <button
               onClick={handlePrevTrack}
-              title="Previous soundscape"
-              className="p-3 text-white/60 hover:text-orange-400 transition-all bg-neutral-950 hover:bg-neutral-900 border border-white/5 rounded-full active:scale-95 shadow-sm"
+              type="button"
+              className={`p-3 transition-colors rounded-full active:scale-95 shadow-sm border ${
+                isDark 
+                  ? 'text-stone-300 bg-stone-900 hover:bg-stone-800 border-stone-800 hover:text-amber-500' 
+                  : 'text-stone-600 bg-white hover:bg-stone-100 border-stone-200 hover:text-amber-700'
+              }`}
             >
               <div className="rotate-180"><div className="flex"><ChevronRight size={16} /></div></div>
             </button>
 
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              title={isPlaying ? "Pause music" : "Play music"}
-              className="w-14 h-14 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-500/20 active:scale-95 transition-all"
+              type="button"
+              className="w-14 h-14 rounded-full bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center shadow-md active:scale-95 transition-all border border-amber-500"
             >
               {isPlaying ? <Pause size={20} fill="white" /> : <Play size={20} className="ml-0.5" fill="white" />}
             </button>
 
             <button
               onClick={handleNextTrack}
-              title="Next soundscape"
-              className="p-3 text-white/60 hover:text-orange-400 transition-all bg-neutral-950 hover:bg-neutral-900 border border-white/5 rounded-full active:scale-95 shadow-sm"
+              type="button"
+              className={`p-3 transition-colors rounded-full active:scale-95 shadow-sm border ${
+                isDark 
+                  ? 'text-stone-300 bg-stone-900 hover:bg-stone-800 border-stone-800 hover:text-amber-500' 
+                  : 'text-stone-600 bg-white hover:bg-stone-100 border-stone-200 hover:text-amber-700'
+              }`}
             >
               <ChevronRight size={16} />
             </button>
           </div>
 
           {/* Background and Timer drawers stacked nicely */}
-          <div className="space-y-3 bg-neutral-950/40 p-4 rounded-2xl border border-white/5">
+          <div className={`space-y-3 p-4 rounded-xl border transition-colors ${
+            isDark ? 'bg-stone-950/80 border-stone-855' : 'bg-stone-50 border-stone-200'
+          }`}>
             
             {/* Sleeper companion dropdown selectors */}
             <div className="flex items-center justify-between gap-4">
-              <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider flex items-center gap-1.5">
-                <Disc size={11} className="text-orange-400" />
-                选用梦境图像 (Disc Art)
+              <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors ${
+                isDark ? 'text-stone-400' : 'text-stone-500'
+              }`}>
+                <Disc size={11} className="text-amber-600" />
+                梦境背景 (Disc Art)
               </span>
               <select
                 value={selectedMandalaId}
                 onChange={(e) => setSelectedMandalaId(e.target.value)}
-                className="bg-[#1c1817] text-white/80 border border-white/10 rounded-xl px-2 py-1 text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 max-w-[150px]"
+                className={`border rounded-xl px-2 py-1 text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-amber-600 max-w-[150px] shadow-sm ml-auto transition-colors ${
+                  isDark 
+                    ? 'bg-stone-900 border-stone-800 text-stone-200' 
+                    : 'bg-white border-stone-250 text-stone-800'
+                }`}
               >
                 <option value="default">默认几何曼陀罗</option>
                 {savedMandalas.map(m => (
@@ -583,28 +664,81 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             </div>
 
             {/* Built-in timer settings bar */}
-            <div className="space-y-1.5 border-t border-white/5 pt-2.5">
-              <label className="text-[10px] font-bold text-white/30 uppercase tracking-wider block flex items-center gap-1.5">
-                <Moon size={11} className="text-indigo-400" />
-                自动关机定时 (Sleep Timer)
+            <div className={`space-y-2 border-t pt-2.5 transition-colors ${
+              isDark ? 'border-stone-850' : 'border-stone-201/50'
+            }`}>
+              <label className={`text-[10px] font-bold uppercase tracking-wider block flex items-center gap-1.5 transition-colors ${
+                isDark ? 'text-stone-400' : 'text-stone-500'
+              }`}>
+                <Moon size={11} className="text-amber-600" />
+                自动关机定时
               </label>
+              
               <div className="grid grid-cols-4 gap-1.5">
                 {([15, 30, 60, null] as const).map((mins) => {
                   const isActive = timerConfig === mins;
                   return (
                     <button
                       key={mins ?? 'inf'}
-                      onClick={() => handleSetTimer(mins)}
+                      type="button"
+                      onClick={() => {
+                        handleSetTimer(mins);
+                        if (mins !== null) {
+                          setCustomMinutes(mins.toString());
+                        } else {
+                          setCustomMinutes('');
+                        }
+                      }}
                       className={`py-1.5 rounded-lg text-[10px] font-semibold transition-all border ${
                         isActive
-                          ? 'bg-indigo-500 text-white border-indigo-400 font-bold'
-                          : 'bg-white/2 text-white/40 border-transparent hover:bg-white/5'
+                          ? 'bg-amber-600 text-white border-amber-500 font-bold'
+                          : isDark
+                            ? 'bg-stone-900 text-stone-300 border-stone-800 hover:bg-stone-800 hover:text-stone-100'
+                            : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100/60'
                       }`}
                     >
-                      {mins ? `${mins}m` : 'None'}
+                      {mins ? `${mins}分钟` : '不限'}
                     </button>
                   );
                 })}
+              </div>
+
+              {/* Custom input line - explicitly requested */}
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className={`text-[10px] whitespace-nowrap font-medium transition-colors ${
+                  isDark ? 'text-stone-400' : 'text-stone-500'
+                }`}>
+                  自定义时长:
+                </span>
+                <div className="relative flex-1 flex items-center">
+                  <input
+                    type="number"
+                    min="1"
+                    max="1440"
+                    placeholder="输入自定义分钟"
+                    value={customMinutes}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomMinutes(val);
+                      if (val && !isNaN(Number(val))) {
+                        const mins = Math.max(1, Math.min(1440, Number(val)));
+                        handleSetTimer(mins);
+                      } else {
+                        handleSetTimer(null);
+                      }
+                    }}
+                    className={`w-full text-xs font-semibold px-3 py-1.5 rounded-xl border outline-none focus:ring-1 focus:ring-amber-600 transition-colors pr-10 ${
+                      isDark 
+                        ? 'bg-stone-900 border-stone-800 text-stone-100 placeholder-stone-600' 
+                        : 'bg-white border-stone-250 text-stone-800 placeholder-stone-400'
+                    }`}
+                  />
+                  <span className={`absolute right-3 text-[10px] font-bold ${
+                    isDark ? 'text-stone-500' : 'text-stone-400'
+                  }`}>
+                    分钟
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -614,7 +748,8 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
           <div className="text-center pt-1">
             <button
               onClick={() => onNavigateToTab('mixer')}
-              className="text-xs text-orange-400 hover:text-orange-300 transition-all font-semibold inline-flex items-center gap-1"
+              type="button"
+              className="text-xs text-amber-700 hover:text-amber-800 transition-all font-semibold inline-flex items-center gap-1 hover:underline"
             >
               <span>没有满意的音阶？去定制音轨</span>
               <ChevronRight size={12} />

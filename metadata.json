@@ -2,5 +2,7 @@
   "name": "Mandala Master",
   "description": "Create beautiful symmetrical art with real-time mirroring and multiple symmetry modes.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

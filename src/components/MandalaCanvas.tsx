@@ -261,8 +261,9 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
   const drawGuideLines = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const center = { x: width / 2, y: height / 2 };
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.strokeStyle = 'rgba(180, 140, 100, 0.35)';
     ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]); // Dashed line for technical look
     const n = settings.count;
     for (let i = 0; i < n; i++) {
       const theta = (i * 2 * Math.PI) / n;
@@ -484,18 +485,7 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
   return (
     <div ref={containerRef} className="relative w-full h-full flex items-center justify-center p-12 overflow-hidden cursor-crosshair">
       
-      {/* Absolute Save overlay handle */}
-      <div className="absolute top-4 right-4 z-20">
-        <button
-          onClick={triggerSaveToGalleryFlow}
-          className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 border border-orange-400 text-white rounded-2xl text-xs font-bold transition-all shadow-xl active:scale-95"
-        >
-          <FolderHeart size={14} />
-          <span>同步到睡前图库 (Save to Sleep Gallery)</span>
-        </button>
-      </div>
-
-      <div className="relative aspect-square h-full max-h-full rounded-full bg-neutral-900 border border-white/10 shadow-3xl overflow-hidden touch-none">
+      <div className="relative aspect-square h-full max-h-full rounded-full bg-[#FCFAF6] border border-amber-200/30 shadow-md overflow-hidden touch-none">
         {/* Hidden Master Drawing Storage Canvas */}
         <canvas id="mandala-master-canvas" ref={canvasRef} className="hidden" />
 
@@ -523,21 +513,18 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
       {/* Save Name Modal Dialog */}
       <AnimatePresence>
         {showSaveModal && (
-          <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-[#3A322D]/25 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-sm bg-neutral-900 border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl"
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-sm bg-white border border-stone-200 rounded-3xl p-6 space-y-4 shadow-lg text-stone-800"
             >
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Sparkles size={16} className="text-orange-400" />
-                  保存曼陀罗作品 (Name Mandala)
+                <h3 className="text-sm font-bold text-stone-800 flex items-center gap-2">
+                  <Sparkles size={16} className="text-amber-600" />
+                  保存画作
                 </h3>
-                <p className="text-xs text-white/50">
-                  命名之后，您可以在睡前播放器 TAB 1 直接选用这款背景。
-                </p>
               </div>
 
               <input
@@ -545,22 +532,22 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
                 autoFocus
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
-                placeholder="例如：深夜紫罗兰、海平面、金色佛晓..."
-                className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                placeholder="例如：海风、金色佛晓、宁静林间..."
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-600"
               />
 
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowSaveModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-white/70"
+                  className="flex-1 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-xs font-semibold text-stone-600"
                 >
                   取消
                 </button>
                 <button
                   onClick={performSave}
-                  className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold text-xs text-white shadow-md active:scale-95"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 font-semibold text-xs text-white shadow-sm active:scale-95 border border-amber-500"
                 >
-                  保存并同步
+                  生成并保存
                 </button>
               </div>
             </motion.div>
@@ -575,10 +562,10 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 30 }}
-            className="fixed bottom-6 bg-emerald-500 border border-emerald-400 text-white rounded-2xl px-5 py-3 flex items-center gap-2 text-xs font-bold shadow-2xl z-50"
+            className="fixed bottom-6 bg-stone-800 border border-stone-700 text-stone-100 rounded-2xl px-5 py-3 flex items-center gap-2 text-xs font-medium shadow-md z-50 animate-gpu"
           >
-            <Check size={14} strokeWidth={3} />
-            <span>曼陀罗图片已完美同步到睡前播放器背景选项！</span>
+            <Check size={14} strokeWidth={2.5} className="text-amber-400" />
+            <span>画作已同步到睡前播放器候选背景中。</span>
           </motion.div>
         )}
       </AnimatePresence>
