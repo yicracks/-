@@ -1,45 +1,156 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Check, 
+  Sparkles, 
+  Download, 
+  Trash2, 
+  FolderHeart, 
+  Grid2X2, 
+  Infinity 
+} from 'lucide-react';
 import { MandalaSettings, Point, DrawingTool } from '../types';
 
 interface MandalaCanvasProps {
   settings: MandalaSettings;
   onClear: (clearFn: () => void) => void;
+  onUndo: (undoFn: () => void) => void;
+  onRedo: (redoFn: () => void) => void;
+  onSaveRegister?: (saveFn: () => void) => void;
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+  onSaveToGallery?: (name: string, dataUrl: string) => void;
 }
 
-const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
+const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ 
+  settings, 
+  onClear, 
+  onUndo, 
+  onRedo, 
+  onSaveRegister,
+  onHistoryChange,
+  onSaveToGallery
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const guideCanvasRef = useRef<HTMLCanvasElement>(null);
+  const displayCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
   const [isDrawing, setIsDrawing] = useState(false);
   const startPoint = useRef<Point | null>(null);
   const lastPoint = useRef<Point | null>(null);
 
-  const clear = useCallback(() => {
+  // Undo/Redo Stacks
+  const historyRef = useRef<ImageData[]>([]);
+  const historyIndexRef = useRef<number>(-1);
+
+  // Gallery Save States
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+  const triggerSaveToGalleryFlow = useCallback(() => {
+    setShowSaveModal(true);
+  }, []);
+
+  useEffect(() => {
+    if (onSaveRegister) {
+      onSaveRegister(triggerSaveToGalleryFlow);
+    }
+  }, [onSaveRegister, triggerSaveToGalleryFlow]);
+
+  const saveState = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    try {
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      if (historyIndexRef.current < historyRef.current.length - 1) {
+        historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+      }
+      historyRef.current.push(imgData);
+      if (historyRef.current.length > 40) {
+        historyRef.current.shift();
+      }
+      historyIndexRef.current = historyRef.current.length - 1;
+      
+      if (onHistoryChange) {
+        onHistoryChange(historyIndexRef.current > 0, false);
+      }
+    } catch (err) {
+      console.error("Failed to capture canvas state:", err);
+    }
+  }, [onHistoryChange]);
+
+  const restoreState = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const state = historyRef.current[historyIndexRef.current];
+    if (state) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.putImageData(state, 0, 0);
+    }
+    if (onHistoryChange) {
+      onHistoryChange(
+        historyIndexRef.current > 0,
+        historyIndexRef.current < historyRef.current.length - 1
+      );
+    }
+  }, [onHistoryChange]);
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current > 0) {
+      historyIndexRef.current--;
+      restoreState();
+    }
+  }, [restoreState]);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      historyIndexRef.current++;
+      restoreState();
+    }
+  }, [restoreState]);
+
+  const restart = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }, []);
+    saveState();
+  }, [saveState]);
 
   useEffect(() => {
-    onClear(clear);
-  }, [onClear, clear]);
+    onClear(restart);
+  }, [onClear, restart]);
 
+  useEffect(() => {
+    onUndo(undo);
+  }, [onUndo, undo]);
+
+  useEffect(() => {
+    onRedo(redo);
+  }, [onRedo, redo]);
+
+  // Handle canvas sizing
   useEffect(() => {
     const updateSize = () => {
-      if (!containerRef.current || !canvasRef.current || !previewCanvasRef.current || !guideCanvasRef.current) return;
+      if (!containerRef.current || !canvasRef.current || !previewCanvasRef.current || !guideCanvasRef.current || !displayCanvasRef.current) return;
       
       const canvasContainer = canvasRef.current.parentElement;
       if (!canvasContainer) return;
       
-      // Use clientWidth/Height for 1:1 pixel mapping with integer values
       const width = canvasContainer.clientWidth;
       const height = canvasContainer.clientHeight;
-      const canvases = [canvasRef.current, previewCanvasRef.current, guideCanvasRef.current];
+      if (width === 0 || height === 0) return;
       
-      // Save current content from main canvas
+      const canvases = [canvasRef.current, previewCanvasRef.current, guideCanvasRef.current, displayCanvasRef.current];
+      
+      // Save current content of raw canvas
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = canvasRef.current.width;
       tempCanvas.height = canvasRef.current.height;
@@ -52,7 +163,6 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
         if (!c) return;
         c.width = width;
         c.height = height;
-        // Ensure style matches perfectly
         c.style.width = `${width}px`;
         c.style.height = `${height}px`;
       });
@@ -66,10 +176,9 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
         }
       }
 
-      // Redraw guide lines immediately on size change
-      const gCtx = guideCanvasRef.current.getContext('2d');
-      if (gCtx) {
-        drawGuideLines(gCtx, width, height);
+      // Record first snapshot state if empty
+      if (historyRef.current.length === 0) {
+        saveState();
       }
     };
 
@@ -77,41 +186,96 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
     const observer = new ResizeObserver(updateSize);
     if (containerRef.current) observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [saveState]);
 
-  // Update guide lines
+  // Live Composite Render Loop for continuous expansion tunnel animation
   useEffect(() => {
-    const canvas = guideCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    let animId: number;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawGuideLines(ctx, canvas.width, canvas.height);
-  }, [settings.count]);
+    const tick = () => {
+      const displayCanvas = displayCanvasRef.current;
+      const canvas = canvasRef.current;
+      const previewCanvas = previewCanvasRef.current;
+      const guideCanvas = guideCanvasRef.current;
 
-  const getSymmetricPoints = (p: Point, center: Point): Point[] => {
-    const dx = p.x - center.x;
-    const dy = p.y - center.y;
-    const points: Point[] = [];
+      if (!displayCanvas || !canvas || !previewCanvas || !guideCanvas) {
+        animId = requestAnimationFrame(tick);
+        return;
+      }
+
+      const ctx = displayCanvas.getContext('2d');
+      if (!ctx) return;
+
+      const cx = displayCanvas.width / 2;
+      const cy = displayCanvas.height / 2;
+
+      ctx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
+
+      // 1. Render Drawn Mandala Artwork
+      if (settings.animation === 'nested-zoom') {
+        const numLayers = 8;
+        const offsetVal = (Date.now() / 3200) % 1; // Loop precisely every 3.2s
+        
+        for (let i = 0; i < numLayers; i++) {
+          const layerProgress = i + offsetVal;
+          // Scale exponentially outwards to circles boundary edge
+          const scale = Math.pow(1.7, layerProgress - 4.5);
+          const norm = layerProgress / numLayers;
+          
+          // Smooth fade loop peaking in central area and hitting absolute zero opacity at physical borders
+          const alpha = Math.sin(norm * Math.PI) * (1 - norm * 0.35);
+
+          if (scale > 5.5 || scale < 0.005) continue;
+
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+          ctx.translate(cx, cy);
+          ctx.scale(scale, scale);
+          ctx.translate(-cx, -cy);
+          ctx.drawImage(canvas, 0, 0);
+          ctx.restore();
+        }
+      } else {
+        // Static Presentational render
+        ctx.drawImage(canvas, 0, 0);
+      }
+
+      // 2. Render Live Drag Shape Preview (Always active during mouse events)
+      ctx.drawImage(previewCanvas, 0, 0);
+
+      // 3. Render Guided partition radial slices
+      const gCtx = guideCanvas.getContext('2d');
+      if (gCtx) {
+        gCtx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+        drawGuideLines(gCtx, guideCanvas.width, guideCanvas.height);
+      }
+      ctx.drawImage(guideCanvas, 0, 0);
+
+      animId = requestAnimationFrame(tick);
+    };
+
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [settings.animation, settings.count]);
+
+  const drawGuideLines = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const center = { x: width / 2, y: height / 2 };
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1;
     const n = settings.count;
-    const angle = Math.atan2(dy, dx);
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
     for (let i = 0; i < n; i++) {
-      const theta = angle + (i * 2 * Math.PI) / n;
-      points.push({
-        x: center.x + dist * Math.cos(theta),
-        y: center.y + dist * Math.sin(theta),
-      });
+      const theta = (i * 2 * Math.PI) / n;
+      ctx.beginPath();
+      ctx.moveTo(center.x, center.y);
+      ctx.lineTo(center.x + width * Math.cos(theta), center.y + height * Math.sin(theta));
+      ctx.stroke();
     }
-    return points;
+    ctx.restore();
   };
 
   const drawShape = (ctx: CanvasRenderingContext2D, p1: Point, p2: Point, center: Point) => {
     const n = settings.count;
-    
-    // Points relative to center
     const r1 = { x: p1.x - center.x, y: p1.y - center.y };
     const r2 = { x: p2.x - center.x, y: p2.y - center.y };
 
@@ -199,26 +363,10 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
     ctx.closePath();
   };
 
-  const drawGuideLines = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    const center = { x: width / 2, y: height / 2 };
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1;
-    const n = settings.count;
-    for (let i = 0; i < n; i++) {
-      const theta = (i * 2 * Math.PI) / n;
-      ctx.beginPath();
-      ctx.moveTo(center.x, center.y);
-      ctx.lineTo(center.x + width * Math.cos(theta), center.y + height * Math.sin(theta));
-      ctx.stroke();
-    }
-    ctx.restore();
-  };
-
   const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
+    const displayCanvas = displayCanvasRef.current;
+    if (!displayCanvas) return;
+    const rect = displayCanvas.getBoundingClientRect();
     
     let clientX, clientY;
     if ('touches' in e) {
@@ -230,22 +378,24 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
       clientY = mouseEv.clientY;
     }
 
-    // Precise mapping: (clientX - rect.left) gives CSS pixels.
-    // Since we set canvas.width = rect.width, this is 1:1 if rounding is handled.
     const p = { 
       x: clientX - rect.left, 
       y: clientY - rect.top 
     };
+
     startPoint.current = p;
     lastPoint.current = p;
     setIsDrawing(true);
   };
 
   const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || !startPoint.current) return;
+    if (!isDrawing || !startPoint.current || !lastPoint.current) return;
+    const displayCanvas = displayCanvasRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
+    const previewCanvas = previewCanvasRef.current;
+    if (!displayCanvas || !canvas || !previewCanvas) return;
+
+    const rect = displayCanvas.getBoundingClientRect();
 
     let clientX, clientY;
     if ('touches' in e) {
@@ -261,12 +411,11 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
       x: clientX - rect.left, 
       y: clientY - rect.top 
     };
-    const previewCanvas = previewCanvasRef.current!;
     const center = { x: canvas.width / 2, y: canvas.height / 2 };
 
     if (settings.tool === 'brush') {
       const ctx = canvas.getContext('2d')!;
-      drawShape(ctx, lastPoint.current!, currentPoint, center);
+      drawShape(ctx, lastPoint.current, currentPoint, center);
       lastPoint.current = currentPoint;
     } else {
       const pCtx = previewCanvas.getContext('2d')!;
@@ -278,9 +427,13 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
   const handleEnd = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing || !startPoint.current) return;
     
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
+    const displayCanvas = displayCanvasRef.current;
+    const canvas = canvasRef.current;
+    const previewCanvas = previewCanvasRef.current;
+    if (displayCanvas && canvas && previewCanvas) {
+      const rect = displayCanvas.getBoundingClientRect();
       let clientX, clientY;
+      
       if ('changedTouches' in e) {
         clientX = e.changedTouches[0].clientX;
         clientY = e.changedTouches[0].clientY;
@@ -294,8 +447,6 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
       }
 
       const endPoint = { x: clientX - rect.left, y: clientY - rect.top };
-      const canvas = canvasRef.current!;
-      const previewCanvas = previewCanvasRef.current!;
       const center = { x: canvas.width / 2, y: canvas.height / 2 };
 
       if (settings.tool !== 'brush') {
@@ -305,6 +456,8 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
       
       const pCtx = previewCanvas.getContext('2d')!;
       pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+      saveState();
     }
 
     setIsDrawing(false);
@@ -312,24 +465,49 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
     lastPoint.current = null;
   };
 
+  const performSave = () => {
+    const rawCanvas = canvasRef.current;
+    if (!rawCanvas || !onSaveToGallery) return;
+    
+    const finalName = saveName.trim() || `暖心曼陀罗 #${Date.now().toString().slice(-4)}`;
+    const url = rawCanvas.toDataURL('image/png');
+    
+    onSaveToGallery(finalName, url);
+    setSaveName('');
+    setShowSaveModal(false);
+    setShowSuccessToast(true);
+    setTimeout(() => {
+      setShowSuccessToast(false);
+    }, 1500);
+  };
+
   return (
     <div ref={containerRef} className="relative w-full h-full flex items-center justify-center p-12 overflow-hidden cursor-crosshair">
-      <div className="relative aspect-square h-full max-h-full rounded-full bg-neutral-900 border border-white/10 shadow-2xl overflow-hidden touch-none">
-        {/* Guide Lines Canvas */}
+      
+      {/* Absolute Save overlay handle */}
+      <div className="absolute top-4 right-4 z-20">
+        <button
+          onClick={triggerSaveToGalleryFlow}
+          className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 border border-orange-400 text-white rounded-2xl text-xs font-bold transition-all shadow-xl active:scale-95"
+        >
+          <FolderHeart size={14} />
+          <span>同步到睡前图库 (Save to Sleep Gallery)</span>
+        </button>
+      </div>
+
+      <div className="relative aspect-square h-full max-h-full rounded-full bg-neutral-900 border border-white/10 shadow-3xl overflow-hidden touch-none">
+        {/* Hidden Master Drawing Storage Canvas */}
+        <canvas id="mandala-master-canvas" ref={canvasRef} className="hidden" />
+
+        {/* Hidden Guide Slices Layer */}
+        <canvas ref={guideCanvasRef} className="hidden" />
+
+        {/* Hidden Interactive Shape Preview Layer */}
+        <canvas ref={previewCanvasRef} className="hidden" />
+
+        {/* Presentational Dynamic Display Canvas (The Composite Renderer) */}
         <canvas
-          ref={guideCanvasRef}
-          className="absolute inset-0 pointer-events-none opacity-50"
-          style={{ width: '100%', height: '100%' }}
-        />
-        {/* Main Drawing Canvas */}
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 block"
-          style={{ width: '100%', height: '100%' }}
-        />
-        {/* Preview Canvas */}
-        <canvas
-          ref={previewCanvasRef}
+          ref={displayCanvasRef}
           onMouseDown={handleStart}
           onMouseMove={handleMove}
           onMouseUp={handleEnd}
@@ -341,9 +519,72 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ settings, onClear }) => {
           style={{ width: '100%', height: '100%' }}
         />
       </div>
+
+      {/* Save Name Modal Dialog */}
+      <AnimatePresence>
+        {showSaveModal && (
+          <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm bg-neutral-900 border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl"
+            >
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Sparkles size={16} className="text-orange-400" />
+                  保存曼陀罗作品 (Name Mandala)
+                </h3>
+                <p className="text-xs text-white/50">
+                  命名之后，您可以在睡前播放器 TAB 1 直接选用这款背景。
+                </p>
+              </div>
+
+              <input
+                type="text"
+                autoFocus
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="例如：深夜紫罗兰、海平面、金色佛晓..."
+                className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSaveModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-white/70"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={performSave}
+                  className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold text-xs text-white shadow-md active:scale-95"
+                >
+                  保存并同步
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast notifications */}
+      <AnimatePresence>
+        {showSuccessToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            className="fixed bottom-6 bg-emerald-500 border border-emerald-400 text-white rounded-2xl px-5 py-3 flex items-center gap-2 text-xs font-bold shadow-2xl z-50"
+          >
+            <Check size={14} strokeWidth={3} />
+            <span>曼陀罗图片已完美同步到睡前播放器背景选项！</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };
 
 export default MandalaCanvas;
-// End of file
