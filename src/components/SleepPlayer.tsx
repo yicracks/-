@@ -24,8 +24,11 @@ interface SleepPlayerProps {
   savedTracks: SavedTrack[];
   activeTrackId: string;
   setActiveTrackId: (id: string) => void;
-  onNavigateToTab: (tab: 'player' | 'canvas' | 'mixer') => void;
+  selectedMandalaId: string;
+  setSelectedMandalaId: (id: string) => void;
+  onNavigateToTab: (tab: 'player' | 'canvas' | 'mixer' | 'creations') => void;
   isDark?: boolean;
+  fadeEnabled?: boolean;
 }
 
 // Predefined relax ambient soundtracks
@@ -65,17 +68,50 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
   savedTracks,
   activeTrackId,
   setActiveTrackId,
+  selectedMandalaId,
+  setSelectedMandalaId,
   onNavigateToTab,
-  isDark = false
+  isDark = false,
+  fadeEnabled = true
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [timerLeft, setTimerLeft] = useState<number | null>(null); // clock countdown in seconds
   const [timerConfig, setTimerConfig] = useState<number | null>(null); // minutes
   const [customMinutes, setCustomMinutes] = useState<string>('');
-  const [selectedMandalaId, setSelectedMandalaId] = useState<string>('default');
   const [animationMode, setAnimationMode] = useState<AnimationMode>('nested-zoom');
   const [breathingGuide, setBreathingGuide] = useState(false);
   const [breathingPhase, setBreathingPhase] = useState<'Inhale' | 'Hold' | 'Exhale'>('Inhale');
+
+  const [sessionElapsed, setSessionElapsed] = useState<number>(0);
+
+  // Time-decay tick loop for the volume fade-out action
+  useEffect(() => {
+    if (!isPlaying) {
+      setSessionElapsed(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setSessionElapsed(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
+  const getFadeRatio = () => {
+    if (!fadeEnabled || !isPlaying) return 1.0;
+    if (timerConfig !== null && timerLeft !== null) {
+      const totalSeconds = timerConfig * 60;
+      if (totalSeconds <= 0) return 1.0;
+      // Divided into 10 intervals, from 1.0 to 0.19 (lowest limit, not muted)
+      const segment = Math.min(9, Math.floor((sessionElapsed / totalSeconds) * 10));
+      return 1.0 - segment * 0.09;
+    } else {
+      // 10-hour hourly steps
+      const segment = Math.min(9, Math.floor(sessionElapsed / 3600));
+      return 1.0 - segment * 0.09;
+    }
+  };
+
+  const fadeRatio = getFadeRatio();
 
   const getCurrentModeLabel = () => {
     if (breathingGuide) return '当前模式：助眠呼吸引导';
@@ -132,14 +168,14 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
           if (!t.active || t.volume <= 0) return;
 
           if (t.type === 'built-in' && t.soundId) {
-            setSoundVolume(t.soundId, t.volume);
+            setSoundVolume(t.soundId, t.volume * fadeRatio);
           } else if (t.type === 'tts' && t.ttsText) {
-            // Play TTS using custom rate (speed/playbackRate)
+            // Play TTS using comforting slow pace
             if ('speechSynthesis' in window) {
               const utterance = new SpeechSynthesisUtterance(t.ttsText);
-              utterance.volume = t.volume;
-              utterance.rate = t.speed;
-              utterance.pitch = 0.9;
+              utterance.volume = t.volume * fadeRatio;
+              utterance.rate = 0.55; // gentle slow pace (催眠引导语柔和舒缓)
+              utterance.pitch = 0.85; // comforting softer voice pitch
               const voices = window.speechSynthesis.getVoices();
               const premiumZhVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('ZH'));
               if (premiumZhVoice) utterance.voice = premiumZhVoice;
@@ -149,7 +185,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             try {
               const audio = new Audio(t.recordedUrl);
               audio.loop = true;
-              audio.volume = t.volume;
+              audio.volume = t.volume * fadeRatio;
               audio.playbackRate = t.speed;
               audio.play().catch(e => console.error("Error playing mic track:", e));
               activeMixerAudioNodesRef.current[t.id] = audio;
@@ -158,7 +194,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             try {
               const audio = new Audio(t.importDataUrl);
               audio.loop = true;
-              audio.volume = t.volume;
+              audio.volume = t.volume * fadeRatio;
               audio.playbackRate = t.speed;
               audio.play().catch(e => console.error("Error playing import track:", e));
               activeMixerAudioNodesRef.current[t.id] = audio;
@@ -169,7 +205,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
         // Fallback for default presets
         // 1. Play active natural ASMR sounds
         Object.entries(activeTrack.sounds).forEach(([id, vol]) => {
-          setSoundVolume(id, vol as number);
+          setSoundVolume(id, (vol as number) * fadeRatio);
         });
 
         // 2. Play TTS speech voice
@@ -182,7 +218,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
            try {
              const audio = new Audio(activeTrack.customAudioDataUrl);
              audio.loop = true;
-             audio.volume = 0.8;
+             audio.volume = 0.8 * fadeRatio;
              audio.play().catch(e => console.error("Error playing custom track in tab1:", e));
              customAudioInstanceRef.current = audio;
            } catch(e) {}
@@ -193,7 +229,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
            try {
              const audio = new Audio(activeTrack.recordedAudioDataUrl);
              audio.loop = true;
-             audio.volume = 0.8;
+             audio.volume = 0.8 * fadeRatio;
              audio.play().catch(e => console.error("Error playing recorded track in tab1:", e));
              recordedAudioInstanceRef.current = audio;
            } catch(e) {}
@@ -217,6 +253,41 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
       }
     };
   }, [isPlaying, activeTrackId, activeTrack]);
+
+  // Dynamic smooth volume modulation for the player fade-out effect as time passes
+  useEffect(() => {
+    if (!isPlaying) return;
+    
+    // 1. Modulate natural ASMR sounds
+    if (activeTrack.mixerTracks && activeTrack.mixerTracks.length > 0) {
+      activeTrack.mixerTracks.forEach(t => {
+        if (!t.active || t.volume <= 0) return;
+        if (t.type === 'built-in' && t.soundId) {
+          setSoundVolume(t.soundId, t.volume * fadeRatio);
+        }
+      });
+    } else {
+      Object.entries(activeTrack.sounds).forEach(([id, vol]) => {
+        setSoundVolume(id, (vol as number) * fadeRatio);
+      });
+    }
+
+    // 2. Modulate HTMLAudioElement instances
+    if (customAudioInstanceRef.current) {
+      customAudioInstanceRef.current.volume = 0.8 * fadeRatio;
+    }
+    if (recordedAudioInstanceRef.current) {
+      recordedAudioInstanceRef.current.volume = 0.8 * fadeRatio;
+    }
+    for (const key in activeMixerAudioNodesRef.current) {
+      const node = activeMixerAudioNodesRef.current[key];
+      if (node) {
+        const origTrack = activeTrack.mixerTracks?.find(t => t.id === key);
+        const baseVol = origTrack ? origTrack.volume : 0.8;
+        node.volume = baseVol * fadeRatio;
+      }
+    }
+  }, [fadeRatio, isPlaying, activeTrack]);
 
   // Handle sleep timer countdown ticks
   useEffect(() => {

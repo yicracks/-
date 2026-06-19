@@ -28,14 +28,17 @@ import Sidebar from './components/Sidebar';
 import FloatingToolbar from './components/FloatingToolbar';
 import SleepPlayer from './components/SleepPlayer';
 import SoundMixer from './components/SoundMixer';
+import MyCreations from './components/MyCreations';
 import { MandalaSettings, SavedMandala, SavedTrack } from './types';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'player' | 'canvas' | 'mixer'>('player');
+  const [activeTab, setActiveTab] = useState<'player' | 'canvas' | 'mixer' | 'creations'>('player');
   const [themeMode, setThemeMode] = useState<'day' | 'night' | 'eye' | 'custom'>('day');
   const [customBgColor, setCustomBgColor] = useState<string>('#9AB8A2'); // elegant sage green / pastel custom initial
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [settingsSubTab, setSettingsSubTab] = useState<'appearance' | 'about'>('appearance');
+  const [fadeEnabled, setFadeEnabled] = useState<boolean>(true);
+  const [selectedMandalaId, setSelectedMandalaId] = useState<string>('default');
 
   const isDark = themeMode === 'night';
 
@@ -152,6 +155,20 @@ export default function App() {
     setActiveTrackId(track.id);
   };
 
+  const handleDeleteMandala = (id: string) => {
+    setSavedMandalas(prev => prev.filter(m => m.id !== id));
+    if (selectedMandalaId === id) {
+      setSelectedMandalaId('default');
+    }
+  };
+
+  const handleDeleteTrack = (id: string) => {
+    setSavedTracks(prev => prev.filter(t => t.id !== id));
+    if (activeTrackId === id) {
+      setActiveTrackId('track-default-resonance');
+    }
+  };
+
   return (
     <div 
       style={{ backgroundColor: getBgColor() }}
@@ -238,6 +255,22 @@ export default function App() {
             <Volume2 size={13} className={activeTab === 'mixer' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
             <span>催眠混音制作</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('creations')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === 'creations'
+                ? isDark
+                  ? 'bg-stone-800 text-stone-100 shadow-sm border border-stone-700'
+                  : 'bg-white text-stone-900 shadow-sm border border-stone-200'
+                : isDark
+                  ? 'text-stone-400 hover:text-stone-200'
+                  : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            <Sparkles size={13} className={activeTab === 'creations' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
+            <span>我的作品</span>
+          </button>
         </nav>
 
         {/* Dynamic theme adaptive switcher control Settings Gear button */}
@@ -314,8 +347,11 @@ export default function App() {
               savedTracks={savedTracks}
               activeTrackId={activeTrackId}
               setActiveTrackId={setActiveTrackId}
+              selectedMandalaId={selectedMandalaId}
+              setSelectedMandalaId={setSelectedMandalaId}
               onNavigateToTab={setActiveTab}
               isDark={isDark}
+              fadeEnabled={fadeEnabled}
             />
           </motion.div>
 
@@ -357,6 +393,31 @@ export default function App() {
               onAddTrack={handleAddTrack}
               onNavigateToTab={setActiveTab}
               isDark={isDark}
+            />
+          </motion.div>
+
+          {/* 4. My Creations View */}
+          <motion.div
+            key="creations"
+            animate={{ opacity: activeTab === 'creations' ? 1 : 0 }}
+            transition={{ duration: 0.25 }}
+            className="w-full h-full animate-gpu"
+            style={{ 
+              display: activeTab === 'creations' ? 'block' : 'none',
+              pointerEvents: activeTab === 'creations' ? 'auto' : 'none'
+            }}
+          >
+            <MyCreations 
+              savedMandalas={savedMandalas}
+              savedTracks={savedTracks}
+              onDeleteMandala={handleDeleteMandala}
+              onDeleteTrack={handleDeleteTrack}
+              selectedMandalaId={selectedMandalaId}
+              setSelectedMandalaId={setSelectedMandalaId}
+              activeTrackId={activeTrackId}
+              setActiveTrackId={setActiveTrackId}
+              isDark={isDark}
+              onNavigateToTab={setActiveTab}
             />
           </motion.div>
         </motion.main>
@@ -569,6 +630,53 @@ export default function App() {
                         />
                       </motion.div>
                     )}
+
+                    {/* Sleep Timer volume fade-out functional switch */}
+                    <div className={`pt-4 border-t transition-colors ${isDark ? 'border-stone-800' : 'border-stone-105'} space-y-3`}>
+                      <div className="space-y-1 flex justify-between items-center">
+                        <div>
+                          <h3 className={`text-xs font-bold leading-none ${isDark ? 'text-stone-300' : 'text-stone-750'}`}>功能设置 (Functional Settings)</h3>
+                          <p className={`text-[10px] mt-1 ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>个性化调配伴眠音频和播放淡出行为。</p>
+                        </div>
+                      </div>
+
+                      <div 
+                        onClick={() => setFadeEnabled(prev => !prev)}
+                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-4 select-none ${
+                          fadeEnabled 
+                            ? 'border-amber-500 bg-amber-500/5' 
+                            : isDark 
+                              ? 'border-stone-800 bg-stone-950/20 hover:border-stone-750' 
+                              : 'border-stone-200 bg-stone-50/50 hover:border-stone-300'
+                        }`}
+                      >
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold">开启播放器渐弱</span>
+                            <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold ${
+                              fadeEnabled 
+                                ? 'bg-amber-600/10 text-amber-600' 
+                                : isDark ? 'bg-stone-800 text-stone-500' : 'bg-stone-200 text-stone-600'
+                            }`}>默认开启</span>
+                          </div>
+                          <p className={`text-[9.5px] leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                            定时将平滑分成10段，音量按时段均匀递减。若不设定时，则按10小时内平滑均匀递减。最末档将维持伴眠最低档，不彻底静音。
+                          </p>
+                        </div>
+                        <div className="relative">
+                          {/* Modern dynamic toggle switch */}
+                          <div className={`w-9 h-5 rounded-full transition-colors relative ${
+                            fadeEnabled ? 'bg-amber-600' : 'bg-stone-300'
+                          }`}>
+                            <motion.div 
+                              layout
+                              className="absolute w-4 h-4 bg-white rounded-full top-0.5 left-0.5"
+                              animate={{ x: fadeEnabled ? 16 : 0 }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 

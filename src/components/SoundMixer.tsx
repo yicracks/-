@@ -88,6 +88,7 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
   const [mixName, setMixName] = useState('');
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
 
   // Interactive dynamic audio nodes references for playing preview overlays
   const audioNodesRef = useRef<{ [trackId: string]: HTMLAudioElement }>({});
@@ -297,13 +298,13 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
   };
 
   // Play a single TTS sentence preview
-  const previewSingleTTS = (text: string, vol: number, speed: number) => {
+  const previewSingleTTS = (text: string, vol: number) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.volume = vol;
-      utterance.rate = speed;
-      utterance.pitch = 0.9;
+      utterance.rate = 0.55; // gentle, comforting slow pace (催眠引导语柔和舒缓)
+      utterance.pitch = 0.85; // comforting softer frequency
       const voices = window.speechSynthesis.getVoices();
       const premiumZhVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('ZH'));
       if (premiumZhVoice) utterance.voice = premiumZhVoice;
@@ -410,15 +411,6 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                   {mixerTracks.length} / 无限
                 </span>
               </div>
-              
-              {/* Dynamic plus trigger */}
-              <button
-                onClick={() => setShowAddForm(prev => !prev)}
-                className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95 border border-amber-500"
-              >
-                {showAddForm ? <X size={12} /> : <Plus size={12} strokeWidth={2.5} />}
-                <span>{showAddForm ? '隐藏面板' : '叠加热和音轨'}</span>
-              </button>
             </div>
 
             {/* Configured track list */}
@@ -430,12 +422,9 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
               }`}>
                 <Music className="text-stone-400 mb-2 animate-bounce animate-duration-1000" size={32} />
                 <p className={`text-xs ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>当前暂无堆叠音源</p>
-                <button
-                  onClick={() => setShowAddForm(true)}
-                  className="mt-3 text-xs text-amber-600 font-semibold hover:underline"
-                >
-                  点击上方加号开始制作复合白噪音
-                </button>
+                <span className="text-[10px] mt-2.5 text-stone-400 block">
+                  点击右侧加号开始制作专属催眠混音乐曲
+                </span>
               </div>
             ) : (
               <div className="space-y-4">
@@ -491,7 +480,7 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                         {/* Play standalone button for TTS */}
                         {track.type === 'tts' && track.ttsText && (
                           <button
-                            onClick={() => previewSingleTTS(track.ttsText!, track.volume, track.speed)}
+                            onClick={() => previewSingleTTS(track.ttsText!, track.volume)}
                             className={`p-1.5 rounded-lg text-[10px] font-semibold transition-colors ${
                               isDark 
                                 ? 'bg-indigo-950/30 text-indigo-400 border border-indigo-900/50 hover:bg-indigo-900/40' 
@@ -502,17 +491,45 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                           </button>
                         )}
 
-                        {/* Mute switcher */}
-                        <button
-                          onClick={() => handleTrackValueChange(track.id, 'active', !track.active)}
-                          className={`text-[10px] px-2.5 py-1 rounded-lg border font-semibold transition-all ${
-                            track.active
-                              ? isDark ? 'bg-amber-950/40 text-amber-500 border-amber-900' : 'bg-amber-50 text-amber-700 border-amber-200'
-                              : isDark ? 'bg-stone-900 text-stone-500 border-stone-800' : 'bg-stone-50 text-stone-400 border-stone-200'
-                          }`}
-                        >
-                          {track.active ? '已激活' : '已静音'}
-                        </button>
+                        {/* Left-right 开启/关闭 selector capsule track styled with sliding motion */}
+                        <div className={`relative flex items-center rounded-full p-0.5 border text-[10px] font-bold select-none h-7 w-24 transition-colors ${
+                          isDark ? 'bg-stone-950 border-stone-850' : 'bg-stone-100 border-stone-200'
+                        }`}>
+                          {/* Sliding Pill Background indicator */}
+                          <motion.div
+                            className="absolute top-0.5 bottom-0.5 rounded-full bg-amber-600 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
+                            initial={false}
+                            animate={{
+                              left: track.active ? '2px' : 'calc(50% + 1px)',
+                              right: track.active ? 'calc(50% + 1px)' : '2px',
+                            }}
+                            transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+                          />
+                          
+                          <button
+                            type="button"
+                            onClick={() => handleTrackValueChange(track.id, 'active', true)}
+                            className={`w-1/2 h-full z-10 rounded-full transition-colors duration-200 flex items-center justify-center whitespace-nowrap ${
+                              track.active
+                                ? 'text-white'
+                                : isDark ? 'text-stone-500 hover:text-stone-300' : 'text-stone-500 hover:text-stone-700'
+                            }`}
+                          >
+                            开启
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => handleTrackValueChange(track.id, 'active', false)}
+                            className={`w-1/2 h-full z-10 rounded-full transition-colors duration-200 flex items-center justify-center whitespace-nowrap ${
+                              !track.active
+                                ? 'text-white'
+                                : isDark ? 'text-stone-500 hover:text-stone-300' : 'text-stone-505 hover:text-stone-700'
+                            }`}
+                          >
+                            关闭
+                          </button>
+                        </div>
 
                         {/* Delete button */}
                         <button
@@ -528,12 +545,12 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                       </div>
                     </div>
 
-                    {/* Symmetrical volume & play speed sliders */}
-                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-3 transition-colors ${
-                      isDark ? 'border-stone-850' : 'border-stone-100'
+                    {/* Volume slider only - speed removed */}
+                    <div className={`border-t pt-3 transition-colors ${
+                      isDark ? 'border-stone-850' : 'border-stone-105'
                     }`}>
                       {/* Volume */}
-                      <div className="space-y-1 max-w-[180px]">
+                      <div className="space-y-1 w-full max-w-[240px]">
                         <div className="flex justify-between items-center text-[10px] font-medium font-semibold">
                           <span className={isDark ? 'text-stone-500' : 'text-stone-400'}>配戴音量</span>
                           <span className={`font-mono font-semibold ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>{Math.round(track.volume * 100)}%</span>
@@ -545,25 +562,6 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                           step="0.05"
                           value={track.volume}
                           onChange={(e) => handleTrackValueChange(track.id, 'volume', parseFloat(e.target.value))}
-                          className={`w-full accent-amber-600 h-1.5 rounded cursor-pointer ${
-                            isDark ? 'bg-stone-900' : 'bg-stone-100'
-                          }`}
-                        />
-                      </div>
-
-                      {/* Speed/Rate modulation (except built-in, though speed can represent filter sweeps for built-in, showing speed) */}
-                      <div className="space-y-1 max-w-[180px]">
-                        <div className="flex justify-between items-center text-[10px] font-medium font-semibold">
-                          <span className={isDark ? 'text-stone-500' : 'text-stone-450'}>循环速差 (Speed)</span>
-                          <span className={`font-mono font-semibold ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>{track.speed.toFixed(1)}x</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0.5"
-                          max="2.0"
-                          step="0.1"
-                          value={track.speed}
-                          onChange={(e) => handleTrackValueChange(track.id, 'speed', parseFloat(e.target.value))}
                           className={`w-full accent-amber-600 h-1.5 rounded cursor-pointer ${
                             isDark ? 'bg-stone-900' : 'bg-stone-100'
                           }`}
@@ -581,256 +579,282 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
 
         {/* Right 1 Column: Create Form and Save Block */}
         <div className="space-y-6">
-          
-          <AnimatePresence mode="wait">
-            {/* The Plus wizard form */}
-            {showAddForm && (
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className={`border rounded-3xl p-6 space-y-5 shadow-sm transition-colors duration-300 ${
-                  isDark 
-                    ? 'bg-stone-900/80 border-stone-800 text-stone-100 shadow-md shadow-stone-950/20' 
-                    : 'bg-white/95 border-stone-200 text-stone-800'
-                }`}
-              >
-                <div className="flex justify-between items-center border-b pb-2 transition-colors border-stone-250/20">
-                  <span className={`text-xs font-bold ${isDark ? 'text-stone-300' : 'text-stone-600'}`}>配戴新伴眠轨</span>
-                  <button 
-                    onClick={() => setShowAddForm(false)}
-                    className="p-1 hover:bg-stone-100/10 rounded-full text-stone-400 hover:text-stone-50 transition-colors"
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
+          <div className={`border rounded-3xl p-6 space-y-5 shadow-sm transition-colors duration-300 ${
+            isDark 
+              ? 'bg-stone-900/50 border-stone-800/60 text-stone-100' 
+              : 'bg-white/80 border-stone-200/60 text-stone-800'
+          }`}>
+            <h3 className="text-xs font-bold leading-none select-none tracking-wider uppercase opacity-70">
+              制作专属合成音
+            </h3>
 
-                {/* Symmetrical segmented tab for type selection */}
-                <div className={`grid grid-cols-4 p-1 rounded-2xl border transition-colors ${
-                  isDark ? 'bg-stone-950 border-stone-850' : 'bg-stone-100 border-stone-200/50'
-                }`}>
+            {!showOptions && !showAddForm ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <button
+                  type="button"
+                  onClick={() => setShowOptions(true)}
+                  className="w-14 h-14 rounded-full bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center shadow-md shadow-amber-900/10 active:scale-95 transition-all border border-amber-500"
+                >
+                  <Plus size={24} strokeWidth={2.5} />
+                </button>
+                <span className="text-[10px] mt-4 text-stone-450 font-medium tracking-wide">添加新音轨叠加</span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Four visual category choice keys */}
+                <div className="grid grid-cols-4 gap-1.5 p-1 rounded-2xl border transition-colors bg-stone-950/10 border-stone-200/15 dark:bg-stone-950/40">
                   <button
-                    onClick={() => setNewTrackType('built-in')}
-                    className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
-                      newTrackType === 'built-in' 
-                        ? isDark 
-                          ? 'bg-stone-800 text-stone-100 shadow-sm border border-stone-700/60' 
-                          : 'bg-white text-stone-800 shadow-sm border border-stone-200/20' 
+                    type="button"
+                    onClick={() => {
+                      setNewTrackType('built-in');
+                      setShowAddForm(true);
+                      setShowOptions(true);
+                    }}
+                    className={`py-2 rounded-xl text-center text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-1 ${
+                      newTrackType === 'built-in' && showAddForm
+                        ? 'bg-amber-600 text-white shadow-sm border border-amber-500'
                         : isDark
-                          ? 'text-stone-500 hover:text-stone-300'
-                          : 'text-stone-400 hover:text-stone-750'
+                          ? 'text-stone-400 hover:text-stone-100 hover:bg-stone-850'
+                          : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
                     }`}
                   >
-                    <Volume2 size={11} />
-                    <span>自然</span>
-                  </button>
-
-                  <button
-                    onClick={() => setNewTrackType('tts')}
-                    className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
-                      newTrackType === 'tts' 
-                        ? isDark 
-                          ? 'bg-stone-800 text-stone-100 shadow-sm border border-stone-700/60' 
-                          : 'bg-white text-stone-800 shadow-sm border border-stone-200/20' 
-                        : isDark
-                          ? 'text-stone-500 hover:text-stone-300'
-                          : 'text-stone-400 hover:text-stone-750'
-                    }`}
-                  >
-                    <AudioLines size={11} />
-                    <span>朗读</span>
+                    <Volume2 size={13} />
+                    <span>白噪音</span>
                   </button>
 
                   <button
-                    onClick={() => setNewTrackType('mic')}
-                    className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
-                      newTrackType === 'mic' 
-                        ? isDark 
-                          ? 'bg-stone-800 text-stone-100 shadow-sm border border-stone-700/60' 
-                          : 'bg-white text-stone-800 shadow-sm border border-stone-200/20' 
+                    type="button"
+                    onClick={() => {
+                      setNewTrackType('tts');
+                      setShowAddForm(true);
+                      setShowOptions(true);
+                    }}
+                    className={`py-2 rounded-xl text-center text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-1 ${
+                      newTrackType === 'tts' && showAddForm
+                        ? 'bg-amber-600 text-white shadow-sm border border-amber-500'
                         : isDark
-                          ? 'text-stone-500 hover:text-stone-300'
-                          : 'text-stone-400 hover:text-stone-750'
+                          ? 'text-stone-400 hover:text-stone-100 hover:bg-stone-850'
+                          : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
                     }`}
                   >
-                    <Mic size={11} />
+                    <AudioLines size={13} />
+                    <span>TTS</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewTrackType('mic');
+                      setShowAddForm(true);
+                      setShowOptions(true);
+                    }}
+                    className={`py-2 rounded-xl text-center text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-1 ${
+                      newTrackType === 'mic' && showAddForm
+                        ? 'bg-amber-600 text-white shadow-sm border border-amber-500'
+                        : isDark
+                          ? 'text-stone-400 hover:text-stone-100 hover:bg-stone-850'
+                          : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+                    }`}
+                  >
+                    <Mic size={13} />
                     <span>录音</span>
                   </button>
 
                   <button
-                    onClick={() => setNewTrackType('import')}
-                    className={`py-2 px-1 text-center rounded-xl text-[10px] font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
-                      newTrackType === 'import' 
-                        ? isDark 
-                          ? 'bg-stone-800 text-stone-100 shadow-sm border border-stone-700/60' 
-                          : 'bg-white text-stone-800 shadow-sm border border-stone-200/20' 
+                    type="button"
+                    onClick={() => {
+                      setNewTrackType('import');
+                      setShowAddForm(true);
+                      setShowOptions(true);
+                    }}
+                    className={`py-2 rounded-xl text-center text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-1 ${
+                      newTrackType === 'import' && showAddForm
+                        ? 'bg-amber-600 text-white shadow-sm border border-amber-500'
                         : isDark
-                          ? 'text-stone-500 hover:text-stone-300'
-                          : 'text-stone-400 hover:text-stone-750'
+                          ? 'text-stone-400 hover:text-stone-100 hover:bg-stone-850'
+                          : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
                     }`}
                   >
-                    <Upload size={11} />
-                    <span>导入</span>
+                    <Upload size={13} />
+                    <span>上传</span>
                   </button>
                 </div>
 
-                {/* Inputs area based on selected type */}
-                <div className="space-y-4 pt-1">
-                  
-                  {/* Type 1: Built-in */}
-                  {newTrackType === 'built-in' && (
-                    <div className="space-y-2.5">
-                      <label className={`text-[10px] font-bold block ${isDark ? 'text-stone-400' : 'text-stone-400'}`}>选择内置环境声效</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {AVAILABLE_ASMR_SOUNDS.map(s => {
-                          const isSelected = selectedASMRId === s.id;
-                          return (
-                            <button
-                              key={s.id}
-                              type="button"
-                              onClick={() => setSelectedASMRId(s.id)}
-                              className={`p-3 rounded-xl border text-left transition-all relative ${
-                                isSelected 
-                                  ? isDark 
-                                    ? 'bg-amber-950/40 border-amber-600/60 text-amber-200 font-semibold shadow-sm shadow-amber-950/40' 
-                                    : 'bg-amber-50 border-amber-400 text-stone-900 font-semibold' 
-                                  : isDark 
-                                    ? 'bg-stone-950/30 border-stone-850 hover:bg-stone-900 text-stone-400' 
-                                    : 'bg-stone-50 border-stone-100 hover:bg-stone-100 text-stone-600'
-                              }`}
-                            >
-                              <div className="text-[11px] font-bold">{s.name.split(' ')[0]}</div>
-                              <div className="text-[8px] opacity-40 mt-0.5 truncate">{s.desc}</div>
-                              {isSelected && (
-                                <div className="absolute top-1.5 right-1.5 bg-amber-600 text-white p-0.5 rounded-full scale-75">
-                                  <Check size={8} strokeWidth={4} />
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Type 2: TTS */}
-                  {newTrackType === 'tts' && (
-                    <div className="space-y-2.5">
-                      <label className={`text-[10px] font-bold block ${isDark ? 'text-stone-400' : 'text-stone-400'}`}>输入转换朗读的文字段落</label>
-                      <textarea
-                        value={ttsInput}
-                        onChange={(e) => setTtsInput(e.target.value)}
-                        placeholder="输入一段舒缓安详的词句，比如：拥抱深夜，呼气放松..."
-                        className={`w-full border rounded-xl p-3 text-xs resize-none transition-colors focus:outline-none focus:ring-1 focus:ring-amber-600 h-24 ${
-                          isDark 
-                            ? 'bg-stone-950 border-stone-800 text-stone-100 placeholder-stone-600' 
-                            : 'bg-stone-50 border-stone-200 text-stone-800 placeholder-stone-400'
-                        }`}
-                      />
-                    </div>
-                  )}
-
-                  {/* Type 3: Mic record */}
-                  {newTrackType === 'mic' && (
-                    <div className="space-y-3">
-                      <label className="text-[10px] text-stone-400 font-bold block">现场捕捉睡意亲语</label>
-                      <div className={`flex flex-col items-center justify-center p-4 rounded-2xl border text-center space-y-3 transition-colors ${
-                        isDark ? 'bg-stone-950/40 border-stone-800' : 'bg-stone-50 border-stone-200/80'
-                      }`}>
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center relative ${
-                          isRecording ? 'bg-red-500 animate-pulse text-white' : recordedUrl ? 'bg-amber-950/30 text-amber-500 border border-amber-900/50' : 'bg-stone-100 text-stone-400'
-                        }`}>
-                          <Mic size={18} />
-                          {isRecording && <span className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping" />}
-                        </div>
-                        
-                        <div className={`text-[10px] font-semibold ${isDark ? 'text-stone-300' : 'text-stone-500'}`}>
-                          {isRecording ? `录音进行中... ${recordDuration}秒` : recordedUrl ? `录音就绪：${recordDuration}秒` : '等待开始'}
-                        </div>
-
-                        <div className="flex gap-2">
-                          {!isRecording ? (
-                            <button
-                              type="button"
-                              onClick={startRecording}
-                              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-[10px]"
-                            >
-                              {recordedUrl ? '重新录音' : '开始录制'}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={stopRecording}
-                              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-[10px]"
-                            >
-                              停止录音
-                            </button>
-                          )}
+                {/* Subform context inputs shown when showAddForm is true */}
+                {showAddForm && (
+                  <div className="space-y-4 pt-1 animate-gpu">
+                    {/* Type 1: Built-in */}
+                    {newTrackType === 'built-in' && (
+                      <div className="space-y-2.5">
+                        <label className={`text-[10px] font-bold block ${isDark ? 'text-stone-400' : 'text-stone-450'}`}>选择内置环境声效</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {AVAILABLE_ASMR_SOUNDS.map(s => {
+                            const isSelected = selectedASMRId === s.id;
+                            return (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => setSelectedASMRId(s.id)}
+                                className={`p-3 rounded-xl border text-left transition-all relative ${
+                                  isSelected 
+                                    ? isDark 
+                                      ? 'bg-amber-950/40 border-amber-600/60 text-amber-200 font-semibold shadow-sm' 
+                                      : 'bg-amber-50 border-amber-400 text-stone-900 font-semibold' 
+                                    : isDark 
+                                      ? 'bg-stone-950/30 border-stone-850 hover:bg-stone-900 text-stone-400' 
+                                      : 'bg-stone-50 border-stone-100 hover:bg-stone-100 text-stone-600'
+                                }`}
+                              >
+                                <div className="text-[11px] font-bold">{s.name.split(' ')[0]}</div>
+                                <div className="text-[8px] opacity-40 mt-0.5 truncate">{s.desc}</div>
+                                {isSelected && (
+                                  <div className="absolute top-1.5 right-1.5 bg-amber-600 text-white p-0.5 rounded-full scale-75 animate-bounce">
+                                    <Check size={8} strokeWidth={4} />
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Type 4: File Import */}
-                  {newTrackType === 'import' && (
-                    <div className="space-y-3">
-                      <label className="text-[10px] text-stone-400 font-bold block">本地自然音源导入</label>
-                      {importedFile ? (
-                        <div className={`p-3 border rounded-xl flex items-center justify-between transition-colors ${
-                          isDark ? 'bg-stone-950/45 border-stone-850' : 'bg-stone-50 border-stone-200'
-                        }`}>
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <FileAudio className="text-amber-600 flex-shrink-0" size={14} />
-                            <div className="overflow-hidden">
-                              <span className={`text-[11px] font-semibold block truncate ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>{importedFile.name}</span>
-                              <span className="text-[8px] text-stone-450">{importedFile.size} · {Math.ceil(importedFile.duration)}s</span>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setImportedFile(null)}
-                            className="p-1 hover:bg-stone-200/10 rounded text-stone-400 hover:text-stone-50 transition-colors"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className={`border border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
-                          isDark 
-                            ? 'border-stone-850 hover:border-amber-500 bg-stone-950/30' 
-                            : 'border-stone-250 hover:border-amber-500 bg-stone-50 hover:bg-stone-100/60'
-                        }`}>
-                          <input
-                            type="file"
-                            accept="audio/*"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                          />
-                          <Upload className="text-stone-450 mb-2" size={18} />
-                          <span className={`text-[10px] font-semibold ${isDark ? 'text-stone-300' : 'text-stone-700'}`}>选取音频文件</span>
-                          <span className="text-[8px] text-stone-550 block mt-0.5">MP3 / WAV / M4A 助眠声效</span>
+                    {/* Type 2: TTS */}
+                    {newTrackType === 'tts' && (
+                      <div className="space-y-2.5">
+                        <label className={`text-[10px] font-bold block ${isDark ? 'text-stone-400' : 'text-stone-450'}`}>
+                          输入转换朗读的催眠引导词
                         </label>
-                      )}
+                        <textarea
+                          value={ttsInput}
+                          onChange={(e) => setTtsInput(e.target.value)}
+                          placeholder="输入一段舒缓安详的催眠词，例如：深深地吸气，缓缓地呼气，拥抱深夜宁静..."
+                          className={`w-full border rounded-xl p-3 text-xs resize-none transition-colors focus:outline-none focus:ring-1 focus:ring-amber-600 h-24 ${
+                            isDark 
+                              ? 'bg-stone-950 border-stone-800 text-stone-100 placeholder-stone-600' 
+                              : 'bg-stone-50 border-stone-200 text-stone-800 placeholder-stone-400'
+                          }`}
+                        />
+                        <p className={`text-[8.5px] leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                          * 播讲特设了轻柔缓慢音调，模拟专业催眠播音引导。
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Type 3: Mic recorder */}
+                    {newTrackType === 'mic' && (
+                      <div className="space-y-3">
+                        <label className="text-[10px] text-stone-400 font-bold block">现场捕捉睡意语录</label>
+                        <div className={`flex flex-col items-center justify-center p-4 rounded-2xl border text-center space-y-3 transition-colors ${
+                          isDark ? 'bg-stone-950/40 border-stone-800' : 'bg-stone-50 border-stone-200/85'
+                        }`}>
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center relative ${
+                            isRecording ? 'bg-red-500 animate-pulse text-white' : recordedUrl ? 'bg-amber-950/30 text-amber-500 border border-amber-900/50' : 'bg-stone-100 text-stone-400'
+                          }`}>
+                            <Mic size={18} />
+                            {isRecording && <span className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping" />}
+                          </div>
+                          
+                          <div className={`text-[10px] font-semibold ${isDark ? 'text-stone-300' : 'text-stone-550'}`}>
+                            {isRecording ? `录音进行中... ${recordDuration}秒` : recordedUrl ? `录音就绪：${recordDuration}秒` : '等待开始'}
+                          </div>
+
+                          <div className="flex gap-2">
+                            {!isRecording ? (
+                              <button
+                                type="button"
+                                onClick={startRecording}
+                                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-[10px]"
+                              >
+                                {recordedUrl ? '重新录音' : '开始录制'}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={stopRecording}
+                                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-[10px]"
+                              >
+                                停止录音
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Type 4: Upload */}
+                    {newTrackType === 'import' && (
+                      <div className="space-y-3">
+                        <label className="text-[10px] text-stone-400 font-bold block">本地自然音源导入</label>
+                        {importedFile ? (
+                          <div className={`p-3 border rounded-xl flex items-center justify-between transition-colors ${
+                            isDark ? 'bg-stone-950/45 border-stone-850' : 'bg-stone-50 border-stone-200'
+                          }`}>
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <FileAudio className="text-amber-600 flex-shrink-0" size={14} />
+                              <div className="overflow-hidden">
+                                <span className={`text-[11px] font-semibold block truncate ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>{importedFile.name}</span>
+                                <span className="text-[8px] text-stone-450">{importedFile.size} · {Math.ceil(importedFile.duration)}s</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setImportedFile(null)}
+                              className="p-1 hover:bg-stone-200/10 rounded text-stone-400 hover:text-stone-50 transition-colors"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className={`border border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
+                            isDark 
+                              ? 'border-stone-850 hover:border-amber-500 bg-stone-950/30' 
+                              : 'border-stone-250 hover:border-amber-500 bg-stone-50 hover:bg-stone-100/60'
+                          }`}>
+                            <input
+                              type="file"
+                              accept="audio/*"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                            />
+                            <Upload className="text-stone-450 mb-2" size={18} />
+                            <span className={`text-[10px] font-semibold ${isDark ? 'text-stone-300' : 'text-stone-700'}`}>选取音频文件</span>
+                            <span className="text-[8px] text-stone-550 block mt-0.5">MP3 / WAV / M4A 助眠声效</span>
+                          </label>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Operational Actions */}
+                    <div className="flex gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddForm(false);
+                          setShowOptions(false);
+                        }}
+                        className={`flex-1 py-2 rounded-xl text-[10px] font-bold ${
+                          isDark 
+                            ? 'bg-stone-800 hover:bg-stone-750 text-stone-300' 
+                            : 'bg-stone-100 hover:bg-stone-200 text-stone-600'
+                        }`}
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmAddTrack}
+                        className="flex-1 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold shadow-sm border border-amber-500"
+                      >
+                        确定叠加
+                      </button>
                     </div>
-                  )}
-
-                  {/* Add action button */}
-                  <button
-                    type="button"
-                    onClick={handleConfirmAddTrack}
-                    className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 active:scale-98 shadow-sm border border-amber-500"
-                  >
-                    <Check size={13} strokeWidth={2.5} />
-                    <span>确定叠加此音轨</span>
-                  </button>
-
-                </div>
-              </motion.div>
+                  </div>
+                )}
+              </div>
             )}
-          </AnimatePresence>
-
+          </div>
         </div>
-
       </div>
 
       {/* Simplified bottom action console */}

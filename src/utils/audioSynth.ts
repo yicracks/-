@@ -319,8 +319,8 @@ export function playTextSpeech(text: string, onEnd?: () => void) {
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel(); // kill existing readings
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.85; // slightly slower hypnotic voice
-    utterance.pitch = 0.9;  // deep calming pitch
+    utterance.rate = 0.55; // gentle, comforting slow pace (催眠引导语柔和舒缓)
+    utterance.pitch = 0.85; // deep comforting warmer tone
     
     // Choose high quality regional mandarin or generic voice
     const voices = window.speechSynthesis.getVoices();
