@@ -7,6 +7,9 @@ export interface MandalaSettings {
   brushSize: number;
   tool: DrawingTool;
   animation: AnimationMode;
+  animationSpeed: number;   // 1-5, speed multiplier
+  animationDensity: number; // 2-10, number of nested circles
+  maxZoomScale: number;     // 2.0-8.0, maximum multiplier scale
 }
 
 export interface Point {

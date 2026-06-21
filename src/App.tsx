@@ -31,6 +31,50 @@ import SoundMixer from './components/SoundMixer';
 import MyCreations from './components/MyCreations';
 import { MandalaSettings, SavedMandala, SavedTrack } from './types';
 
+export const MandalaLogo: React.FC<{ size?: number; className?: string }> = ({ size = 24, className = "" }) => {
+  return (
+    <svg 
+      viewBox="0 0 100 100" 
+      width={size} 
+      height={size} 
+      className={`animate-spin-slow ${className}`}
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* Central circular core connecting the petals */}
+      <circle cx="50" cy="50" r="5" fill="currentColor" className="stroke-none opacity-40" />
+      <circle cx="50" cy="50" r="9" strokeWidth="1" strokeDasharray="2 2" opacity="0.6" />
+      
+      {/* 6 symmetric petals rotated around the center (50, 50) */}
+      {Array.from({ length: 6 }).map((_, i) => {
+        const angle = i * 60;
+        return (
+          <g key={i} transform={`rotate(${angle}, 50, 50)`}>
+            {/* Elegant minimalist outer petal shape */}
+            <path 
+              d="M 50 50 C 37 36, 37 18, 50 12 C 63 18, 63 36, 50 50 Z" 
+              strokeWidth="2"
+            />
+            {/* Minimalist music note beautifully centered inside the upper portion of the petal */}
+            {/* Note head (small oval) */}
+            <ellipse cx="46.5" cy="27" rx="2.2" ry="1.7" fill="currentColor" className="stroke-none" transform="rotate(-15, 46.5, 27)" />
+            {/* Note stem and flag */}
+            <path 
+              d="M 48.5 27 L 48.5 18 C 51.5 18, 52.5 19.5, 52.5 21.5" 
+              strokeWidth="1.2" 
+              fill="none" 
+              stroke="currentColor"
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'player' | 'canvas' | 'mixer' | 'creations'>('player');
   const [themeMode, setThemeMode] = useState<'day' | 'night' | 'eye' | 'custom'>('day');
@@ -88,12 +132,15 @@ export default function App() {
     brushSize: 3,
     tool: 'brush',
     animation: 'none',
+    animationSpeed: 2,
+    animationDensity: 4,
+    maxZoomScale: 4.0,
   });
 
   // State caches for saved elements synced between creators
   const [savedMandalas, setSavedMandalas] = useState<SavedMandala[]>([]);
   const [savedTracks, setSavedTracks] = useState<SavedTrack[]>([]);
-  const [activeTrackId, setActiveTrackId] = useState<string>('track-default-resonance');
+  const [activeTrackId, setActiveTrackId] = useState<string>('track-default-calming-night');
 
   // Drawing Canvas control commands registration slots
   const [clearFn, setClearFn] = useState<() => void>(() => () => {});
@@ -165,8 +212,16 @@ export default function App() {
   const handleDeleteTrack = (id: string) => {
     setSavedTracks(prev => prev.filter(t => t.id !== id));
     if (activeTrackId === id) {
-      setActiveTrackId('track-default-resonance');
+      setActiveTrackId('track-default-calming-night');
     }
+  };
+
+  const handleRenameMandala = (id: string, newName: string) => {
+    setSavedMandalas(prev => prev.map(m => m.id === id ? { ...m, name: newName } : m));
+  };
+
+  const handleRenameTrack = (id: string, newName: string) => {
+    setSavedTracks(prev => prev.map(t => t.id === id ? { ...t, name: newName } : t));
   };
 
   return (
@@ -194,15 +249,15 @@ export default function App() {
           : 'bg-white/70 border-stone-200/60 text-stone-800'
       }`}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center border border-amber-250 text-amber-700 shadow-sm shadow-amber-500/5">
-            <Compass size={18} className="animate-spin-slow text-amber-600" />
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-600 shadow-sm shadow-amber-500/5">
+            <MandalaLogo size={24} className="text-amber-600" />
           </div>
           <div>
-            <h1 className={`text-sm font-bold tracking-tight leading-tight transition-colors ${isDark ? 'text-stone-100' : 'text-stone-800'}`}>曼陀罗催眠</h1>
+            <h1 className={`text-base font-extrabold tracking-tight leading-tight transition-colors ${isDark ? 'text-stone-100' : 'text-stone-800'}`}>曼陀罗催眠</h1>
           </div>
         </div>
 
-        {/* Tab Selection Row - Renamed strictly according to request */}
+        {/* Tab Selection Row - Renamed strictly according to request - unified text size */}
         <nav className={`flex p-1 border rounded-2xl gap-1 shadow-sm transition-colors ${
           isDark 
             ? 'bg-stone-950/80 border-stone-800' 
@@ -210,7 +265,7 @@ export default function App() {
         }`}>
           <button
             onClick={() => setActiveTab('player')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
               activeTab === 'player'
                 ? isDark
                   ? 'bg-stone-800 text-stone-100 shadow-sm border border-stone-700'
@@ -220,13 +275,13 @@ export default function App() {
                   : 'text-stone-500 hover:text-stone-800'
             }`}
           >
-            <Moon size={13} className={activeTab === 'player' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
+            <Moon size={14} className={activeTab === 'player' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
             <span>催眠播放器</span>
           </button>
 
           <button
             onClick={() => setActiveTab('canvas')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
               activeTab === 'canvas'
                 ? isDark
                   ? 'bg-stone-800 text-stone-100 shadow-sm border border-stone-700'
@@ -236,29 +291,29 @@ export default function App() {
                   : 'text-stone-500 hover:text-stone-800'
             }`}
           >
-            <Grid2X2 size={13} className={activeTab === 'canvas' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
+            <Grid2X2 size={14} className={activeTab === 'canvas' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
             <span>曼陀罗画制作</span>
           </button>
 
           <button
             onClick={() => setActiveTab('mixer')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
               activeTab === 'mixer'
                 ? isDark
                   ? 'bg-stone-800 text-stone-100 shadow-sm border border-stone-700'
                   : 'bg-white text-stone-900 shadow-sm border border-stone-200'
                 : isDark
-                  ? 'text-stone-405 hover:text-stone-200'
-                  : 'text-stone-505 hover:text-stone-800'
+                  ? 'text-stone-400 hover:text-stone-200'
+                  : 'text-stone-500 hover:text-stone-808'
             }`}
           >
-            <Volume2 size={13} className={activeTab === 'mixer' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
+            <Volume2 size={14} className={activeTab === 'mixer' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
             <span>催眠混音制作</span>
           </button>
 
           <button
             onClick={() => setActiveTab('creations')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
               activeTab === 'creations'
                 ? isDark
                   ? 'bg-stone-800 text-stone-100 shadow-sm border border-stone-700'
@@ -268,7 +323,7 @@ export default function App() {
                   : 'text-stone-500 hover:text-stone-800'
             }`}
           >
-            <Sparkles size={13} className={activeTab === 'creations' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
+            <Sparkles size={14} className={activeTab === 'creations' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
             <span>我的作品</span>
           </button>
         </nav>
@@ -296,39 +351,17 @@ export default function App() {
 
       {/* Main Workspace Frame container */}
       <div className="relative w-full flex-1 flex overflow-hidden z-10">
-        
-        {/* Symmetrical Canvas Settings sidebar - only active when drawing */}
-        {activeTab === 'canvas' && (
-          <Sidebar 
-            settings={settings} 
-            setSettings={setSettings} 
-            onClear={clearFn} 
-            onDownload={handleDownload}
-            onSave={saveFn}
-            onUndo={undoFn}
-            onRedo={redoFn}
-            canUndo={canUndo}
-            canRedo={canRedo}
-          />
-        )}
-
-        {/* Floating Sector tools - only active when drawing */}
-        {activeTab === 'canvas' && (
-          <FloatingToolbar settings={settings} setSettings={setSettings} />
-        )}
 
         <motion.main 
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className={`flex-1 relative rounded-[32px] border backdrop-blur-lg shadow-md p-6 transition-all duration-300 ${
+          className={`flex-1 relative rounded-[32px] border backdrop-blur-lg shadow-md p-6 transition-all duration-300 m-6 h-[calc(100vh-130px)] ${
             isDark 
               ? 'border-stone-850/80 bg-stone-900/35 text-stone-100 shadow-stone-950/20' 
               : 'border-stone-200/50 bg-white/40 text-stone-800 shadow-stone-200/10'
           } ${
-            activeTab === 'canvas' 
-              ? 'ml-[336px] m-6 h-[calc(100vh-130px)]' 
-              : 'm-6 h-[calc(100vh-130px)] overflow-y-auto'
+            activeTab === 'canvas' ? 'overflow-hidden' : 'overflow-y-auto'
           }`}
         >
           {/* 1. Sleep Player View */}
@@ -352,6 +385,7 @@ export default function App() {
               onNavigateToTab={setActiveTab}
               isDark={isDark}
               fadeEnabled={fadeEnabled}
+              settings={settings}
             />
           </motion.div>
 
@@ -360,21 +394,46 @@ export default function App() {
             key="canvas"
             animate={{ opacity: activeTab === 'canvas' ? 1 : 0 }}
             transition={{ duration: 0.25 }}
-            className="w-full h-full animate-gpu"
+            className="w-full h-full flex flex-col md:flex-row gap-5 animate-gpu overflow-hidden"
             style={{ 
-              display: activeTab === 'canvas' ? 'block' : 'none',
+              display: activeTab === 'canvas' ? 'flex' : 'none',
               pointerEvents: activeTab === 'canvas' ? 'auto' : 'none'
             }}
           >
-            <MandalaCanvas 
+            {/* Redesigned Sidebar nested directly inside the frame */}
+            <Sidebar 
               settings={settings} 
-              onClear={registerClearFn} 
-              onUndo={registerUndoFn}
-              onRedo={registerRedoFn}
-              onSaveRegister={registerSaveFn}
-              onHistoryChange={handleHistoryChange}
-              onSaveToGallery={handleSaveMandala}
+              setSettings={setSettings} 
+              onClear={clearFn} 
+              onDownload={handleDownload}
+              onSave={saveFn}
+              onUndo={undoFn}
+              onRedo={redoFn}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              isDark={isDark}
             />
+
+            {/* Canvas area container */}
+            <div className={`flex-1 relative h-full rounded-2xl border flex items-center justify-center overflow-hidden transition-colors duration-300 ${
+              isDark 
+                ? 'bg-stone-950/25 border-stone-850/40' 
+                : 'bg-[#FCFAF6]/60 border-stone-200/50'
+            }`}>
+              <MandalaCanvas 
+                settings={settings} 
+                onClear={registerClearFn} 
+                onUndo={registerUndoFn}
+                onRedo={registerRedoFn}
+                onSaveRegister={registerSaveFn}
+                onHistoryChange={handleHistoryChange}
+                onSaveToGallery={handleSaveMandala}
+                savedMandalas={savedMandalas}
+              />
+
+              {/* Floating control toolbar nested inside the canvas container */}
+              <FloatingToolbar settings={settings} setSettings={setSettings} isDark={isDark} />
+            </div>
           </motion.div>
 
           {/* 3. Sound Mixer View */}
@@ -412,6 +471,8 @@ export default function App() {
               savedTracks={savedTracks}
               onDeleteMandala={handleDeleteMandala}
               onDeleteTrack={handleDeleteTrack}
+              onRenameMandala={handleRenameMandala}
+              onRenameTrack={handleRenameTrack}
               selectedMandalaId={selectedMandalaId}
               setSelectedMandalaId={setSelectedMandalaId}
               activeTrackId={activeTrackId}
@@ -636,7 +697,7 @@ export default function App() {
                       <div className="space-y-1 flex justify-between items-center">
                         <div>
                           <h3 className={`text-xs font-bold leading-none ${isDark ? 'text-stone-300' : 'text-stone-750'}`}>功能设置 (Functional Settings)</h3>
-                          <p className={`text-[10px] mt-1 ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>个性化调配伴眠音频和播放淡出行为。</p>
+                          <p className={`text-xs mt-1 ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>个性化调配伴眠音频和播放淡出行为。</p>
                         </div>
                       </div>
 
@@ -652,14 +713,14 @@ export default function App() {
                       >
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold">开启播放器渐弱</span>
-                            <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold ${
+                            <span className="text-sm font-bold">开启播放器渐弱</span>
+                            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
                               fadeEnabled 
                                 ? 'bg-amber-600/10 text-amber-600' 
                                 : isDark ? 'bg-stone-800 text-stone-500' : 'bg-stone-200 text-stone-600'
                             }`}>默认开启</span>
                           </div>
-                          <p className={`text-[9.5px] leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                          <p className={`text-xs leading-relaxed ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
                             定时将平滑分成10段，音量按时段均匀递减。若不设定时，则按10小时内平滑均匀递减。最末档将维持伴眠最低档，不彻底静音。
                           </p>
                         </div>
@@ -677,18 +738,93 @@ export default function App() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Mandala Animation Settings Slider group */}
+                    <div className={`pt-4 border-t transition-colors ${isDark ? 'border-stone-800' : 'border-stone-105'} space-y-3`}>
+                      <div className="space-y-1">
+                        <h3 className={`text-xs font-bold leading-none ${isDark ? 'text-stone-300' : 'text-stone-750'}`}>曼陀罗动画效果微调</h3>
+                        <p className={`text-[10px] mt-1 ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>微调下属物理镜向膨胀动画，营造极佳的空静感。</p>
+                      </div>
+
+                      {/* Speed Slider */}
+                      <div className={`p-3 rounded-2xl border transition-all ${isDark ? 'border-stone-805 bg-stone-950/10' : 'border-stone-200 bg-stone-50/50'}`}>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-xs font-bold">动画节奏 (节奏缓慢)</span>
+                          <span className="text-xs font-mono font-bold text-amber-600">{settings.animationSpeed}x</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="5"
+                          step="1"
+                          value={settings.animationSpeed}
+                          onChange={(e) => setSettings(prev => ({ ...prev, animationSpeed: parseInt(e.target.value, 10) }))}
+                          className="w-full h-1.5 bg-stone-300 rounded-lg appearance-none cursor-pointer accent-amber-600 dark:bg-stone-750"
+                        />
+                        <div className="flex justify-between text-[9px] opacity-50 mt-1">
+                          <span>极缓 (1)</span>
+                          <span>默认 (2)</span>
+                          <span>略快 (5)</span>
+                        </div>
+                      </div>
+
+                      {/* Density Slider */}
+                      <div className={`p-3 rounded-2xl border transition-all ${isDark ? 'border-stone-805 bg-stone-950/10' : 'border-stone-200 bg-stone-50/50'}`}>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-xs font-bold">画面密度 (圈数)</span>
+                          <span className="text-xs font-mono font-bold text-amber-600">{settings.animationDensity}层</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="2"
+                          max="8"
+                          step="1"
+                          value={settings.animationDensity}
+                          onChange={(e) => setSettings(prev => ({ ...prev, animationDensity: parseInt(e.target.value, 10) }))}
+                          className="w-full h-1.5 bg-stone-300 rounded-lg appearance-none cursor-pointer accent-amber-600 dark:bg-stone-750"
+                        />
+                        <div className="flex justify-between text-[9px] opacity-50 mt-1">
+                          <span>极简舒适 (2层)</span>
+                          <span>理想 (4/5层)</span>
+                          <span>细密 (8层)</span>
+                        </div>
+                      </div>
+
+                      {/* Max Zoom Scale Slider */}
+                      <div className={`p-3 rounded-2xl border transition-all ${isDark ? 'border-stone-805 bg-stone-950/10' : 'border-stone-200 bg-stone-50/50'}`}>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-xs font-bold">最大膨胀放大范围</span>
+                          <span className="text-xs font-mono font-bold text-amber-600">{settings.maxZoomScale.toFixed(1)}x</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="2"
+                          max="6"
+                          step="0.5"
+                          value={settings.maxZoomScale}
+                          onChange={(e) => setSettings(prev => ({ ...prev, maxZoomScale: parseFloat(e.target.value) }))}
+                          className="w-full h-1.5 bg-stone-300 rounded-lg appearance-none cursor-pointer accent-amber-600 dark:bg-stone-750"
+                        />
+                        <div className="flex justify-between text-[9px] opacity-50 mt-1">
+                          <span>窄幅 (2x)</span>
+                          <span>开阔 (4x)</span>
+                          <span>巨大 (6x)</span>
+                        </div>
+                      </div>
+
+                    </div>
                   </div>
                 )}
 
                 {/* 2. ABOUT TAB PANEL */}
                 {settingsSubTab === 'about' && (
-                  <div className="space-y-4 text-xs">
+                  <div className="space-y-4 text-sm font-sans">
                     <div className="flex flex-col items-center py-3 text-center border-b transition-colors border-stone-200/20 mb-3">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center border border-amber-250 text-amber-700 shadow-sm mb-3">
-                        <Compass size={20} className="animate-spin-slow text-amber-600" />
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-600 shadow-sm mb-3">
+                        <MandalaLogo size={28} className="text-amber-600" />
                       </div>
-                      <h4 className="font-bold text-xs">曼陀罗催眠 (Mandala Hypnosis)</h4>
-                      <p className={`text-[9px] mt-1 ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>Version 1.2.0 · 科学舒适催眠大师</p>
+                      <h4 className="font-extrabold text-sm">曼陀罗催眠 (Mandala Hypnosis)</h4>
+                      <p className={`text-xs mt-1 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>Version 1.2.0 · 科学舒适催眠大师</p>
                     </div>
 
                     <div className="space-y-3.5">
@@ -696,12 +832,12 @@ export default function App() {
                         isDark ? 'bg-stone-950/20 border-stone-850' : 'bg-stone-50/50 border-stone-100'
                       }`}>
                         <div className="flex justify-between items-center">
-                          <span className={`font-semibold ${isDark ? 'text-stone-500' : 'text-stone-450'}`}>作者 (Author)</span>
+                          <span className={`font-semibold ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>作者 (Author)</span>
                           <span className="font-bold font-sans">Yi</span>
                         </div>
 
                         <div className="flex justify-between items-center border-t pt-2.5 transition-colors border-stone-200/20">
-                          <span className={`font-semibold ${isDark ? 'text-stone-500' : 'text-stone-450'}`}>联系方式 (Contact)</span>
+                          <span className={`font-semibold ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>联系方式 (Contact)</span>
                           <a 
                             href="mailto:cracks@yeah.net" 
                             className="font-bold text-amber-600 hover:underline font-mono"
@@ -711,7 +847,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className={`p-4 rounded-xl border text-[9px] leading-relaxed transition-colors ${
+                      <div className={`p-4 rounded-xl border text-xs leading-relaxed transition-colors ${
                         isDark ? 'border-dashed border-stone-800 text-stone-500' : 'border-dashed border-stone-200 text-stone-450'
                       }`}>
                         <p>
@@ -730,7 +866,7 @@ export default function App() {
               }`}>
                 <button
                   onClick={() => setShowSettingsModal(false)}
-                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-95 border border-amber-500"
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold transition-all active:scale-95 border border-amber-500"
                 >
                   确定
                 </button>

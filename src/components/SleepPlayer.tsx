@@ -14,9 +14,11 @@ import {
   ChevronRight,
   RefreshCw,
   Sliders,
-  ChevronLeft
+  ChevronLeft,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
-import { SavedMandala, SavedTrack, AnimationMode } from '../types';
+import { SavedMandala, SavedTrack, AnimationMode, MandalaSettings } from '../types';
 import { AVAILABLE_ASMR_SOUNDS, setSoundVolume, stopAllSounds, playTextSpeech, stopSpeech } from '../utils/audioSynth';
 
 interface SleepPlayerProps {
@@ -29,29 +31,52 @@ interface SleepPlayerProps {
   onNavigateToTab: (tab: 'player' | 'canvas' | 'mixer' | 'creations') => void;
   isDark?: boolean;
   fadeEnabled?: boolean;
+  settings?: MandalaSettings;
 }
 
 // Predefined relax ambient soundtracks
 const PRELOADED_SLEEP_TRACKS: SavedTrack[] = [
   {
-    id: 'track-default-resonance',
-    name: '西藏禅意颂钵',
-    sounds: { 'bowl': 0.8, 'wind': 0.3 }
+    id: 'track-default-calming-night',
+    name: '静谧夜晚花园 (竖琴与鸣虫)',
+    sounds: { 'bgm-calming-night': 0.8 },
+    customAudioName: 'calming-night-garden.mp3',
+    customAudioDataUrl: '/music/bgm/shorts_by_pazuzustudio-calming-night-garden-harp-and-cricket-sounds-545253.mp3'
   },
   {
-    id: 'track-default-rainstorm',
-    name: '深夜林间微雨',
-    sounds: { 'rain': 0.9, 'thunder': 0.3, 'ocean': 0.2 }
+    id: 'track-default-cozy-rain',
+    name: '暖屋屋外小雨 (冥想竖琴)',
+    sounds: { 'bgm-cozy-rain': 0.85 },
+    customAudioName: 'cozy-rain-outside.mp3',
+    customAudioDataUrl: '/music/bgm/shorts_by_pazuzustudio-cozy-rain-outside-meditative-harp-background-545233.mp3'
   },
   {
-    id: 'track-default-tides',
-    name: '永恒海浪潮汐',
-    sounds: { 'ocean': 0.9, 'wind': 0.2, 'bowl': 0.15 }
+    id: 'track-default-magical-forest',
+    name: '魔法森林夜色 (梦幻风铃)',
+    sounds: { 'bgm-magical-forest': 0.8 },
+    customAudioName: 'magical-forest-night.mp3',
+    customAudioDataUrl: '/music/bgm/shorts_by_pazuzustudio-magical-forest-night-enchanting-harp-and-crickets-545256.mp3'
   },
   {
-    id: 'track-default-zen',
-    name: '空山温暖壁炉',
-    sounds: { 'bowl': 0.95, 'crackle': 0.25, 'wind': 0.3 }
+    id: 'track-default-peaceful-midnight',
+    name: '和平午夜之歌 (夏夜鸣蝉)',
+    sounds: { 'bgm-peaceful-midnight': 0.75 },
+    customAudioName: 'peaceful-midnight-harp.mp3',
+    customAudioDataUrl: '/music/bgm/shorts_by_pazuzustudio-peaceful-midnight-harp-with-summer-night-crickets-545257 (1).mp3'
+  },
+  {
+    id: 'track-default-soft-tide',
+    name: '柔和潮汐浪花 (舒缓钢琴)',
+    sounds: { 'bgm-soft-tide': 0.85 },
+    customAudioName: 'soft-tide-piano.mp3',
+    customAudioDataUrl: '/music/bgm/shorts_by_pazuzustudio-soft-tide-amp-intimate-piano-short-edit-521565.mp3'
+  },
+  {
+    id: 'track-default-soul-frequencies',
+    name: '528Hz 灵魂频率 (静心冥想音)',
+    sounds: { 'bgm-soul-frequencies': 0.9 },
+    customAudioName: '528hz-meditation.mp3',
+    customAudioDataUrl: '/music/bgm/soul_frequencies-528hz-meditation-529616.mp3'
   }
 ];
 
@@ -72,9 +97,11 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
   setSelectedMandalaId,
   onNavigateToTab,
   isDark = false,
-  fadeEnabled = true
+  fadeEnabled = true,
+  settings
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [timerLeft, setTimerLeft] = useState<number | null>(null); // clock countdown in seconds
   const [timerConfig, setTimerConfig] = useState<number | null>(null); // minutes
   const [customMinutes, setCustomMinutes] = useState<string>('');
@@ -115,7 +142,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
 
   const getCurrentModeLabel = () => {
     if (breathingGuide) return '当前模式：助眠呼吸引导';
-    if (animationMode === 'nested-zoom') return '当前模式：绚丽嵌套缩放';
+    if (animationMode === 'nested-zoom') return '当前模式：动态效果';
     return '当前模式：静态展示背景';
   };
 
@@ -383,27 +410,28 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
           return;
         }
 
-        if (animationMode === 'nested-zoom' && isPlaying) {
-          // Continuous exponentially outward expander zoom - grows up to margin circular boundaries
-          const numLayers = 8;
-          const offsetVal = (Date.now() / 3000) % 1; // loop precisely every 3s
+        if (animationMode === 'nested-zoom') {
+          // Continuous exponentially outward expander zoom
+          const speed = settings?.animationSpeed || 2;
+          const numLayers = settings?.animationDensity || 4;
+          const maxScale = settings?.maxZoomScale || 4.0;
+          const minScale = 0.05;
+
+          const loopMs = 15000 / speed;
+          const offsetVal = (Date.now() / loopMs) % 1;
           const maxRadius = Math.min(cx, cy);
+
+          // Very slow, soothing rotation
+          const rotationAngle = (Date.now() / (loopMs * 4)) % (Math.PI * 2);
 
           for (let i = 0; i < numLayers; i++) {
             const layerProgress = i + offsetVal;
-            // Exponential scale factor growing outwards
-            const scale = Math.pow(2.2, layerProgress - 3.5);
-            const norm = layerProgress / numLayers; // 0 to 1
+            const p = layerProgress / numLayers;
 
-            // Custom opacity: fade in fast at deep center, stay sharp, and fade out cleanly exactly at physical disc border edge
-            let alpha = 1.0;
-            if (norm < 0.2) {
-              alpha = norm / 0.2;
-            } else if (norm > 0.8) {
-              alpha = Math.max(0, (1.0 - norm) / 0.2);
-            }
-
-            if (scale > 5.5 || scale < 0.005) continue;
+            // Perfect sine curve that reaches exactly 0 on both ends (p=0 and p=1)
+            const alpha = Math.sin(p * Math.PI);
+            // High-fidelity exponential scale calculation
+            const scale = minScale * Math.pow(maxScale / minScale, p);
 
             ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
@@ -414,6 +442,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             ctx.clip();
 
             ctx.translate(cx, cy);
+            ctx.rotate(rotationAngle * (i % 2 === 0 ? 1 : -1) * 0.4); // Stagger rotation
             ctx.scale(scale, scale);
             ctx.translate(-cx, -cy);
             
@@ -448,7 +477,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
     return () => {
       cancelAnimationFrame(animId);
     };
-  }, [selectedMandalaId, animationMode, isPlaying, savedMandalas]);
+  }, [selectedMandalaId, animationMode, isPlaying, savedMandalas, isExpanded, settings]);
 
   // Formatting clock time
   const formatTime = (seconds: number) => {
@@ -468,6 +497,67 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
     setActiveTrackId(allTracks[nextIdx].id);
   };
 
+  if (isExpanded) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center p-4 relative overflow-hidden select-none animate-gpu">
+        
+        {/* Floating subtle control: Close / Minimize */}
+        <button
+          onClick={() => setIsExpanded(false)}
+          className={`absolute top-6 right-6 p-2 rounded-full border shadow-md transition-all z-50 cursor-pointer active:scale-95 ${
+            isDark 
+              ? 'bg-stone-900 border-stone-800 text-stone-300 hover:text-white hover:bg-stone-850' 
+              : 'bg-white border-stone-200 text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+          }`}
+          title="退出沉浸模式"
+        >
+          <Minimize2 size={16} />
+        </button>
+
+        {/* Big centered circular mandala showcase container */}
+        <div className="relative w-full aspect-square max-w-[480px] lg:max-w-[550px] rounded-full p-4 shadow-2xl flex items-center justify-center group transition-all duration-500 bg-stone-950/20">
+          <motion.div
+            animate={isPlaying && animationMode !== 'nested-zoom' ? { rotate: 360 } : { rotate: 0 }}
+            transition={isPlaying && animationMode !== 'nested-zoom' ? { repeat: Infinity, duration: 18, ease: "linear" } : { duration: 0.5 }}
+            className={`relative w-full h-full rounded-full overflow-hidden flex items-center justify-center border shadow-inner transition-colors duration-300 ${
+              isDark ? 'bg-stone-950 border-stone-850' : 'bg-stone-50 border-stone-200'
+            }`}
+          >
+            {/* Embedded Mandala Live Canvas */}
+            <canvas ref={playerCanvasRef} className="absolute inset-0 block pointer-events-none w-full h-full" />
+            
+            {/* Standard CD inner hub silver ring groove decoration */}
+            <div className={`absolute w-[130px] h-[130px] rounded-full border backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-15 transition-colors ${
+              isDark ? 'border-stone-800 bg-stone-900/50' : 'border-stone-200 bg-white/50'
+            }`}>
+              <div className={`w-[100px] h-[100px] rounded-full border border-dashed flex items-center justify-center ${
+                isDark ? 'border-stone-700' : 'border-stone-200'
+              }`}>
+                <div className={`w-[58px] h-[58px] rounded-full border ${
+                  isDark ? 'bg-stone-950 border-stone-800/50' : 'bg-stone-100 border-stone-200/50'
+                }`} />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Tip at the bottom */}
+        <p className={`absolute bottom-6 text-xs tracking-widest pointer-events-none select-none transition-colors opacity-40 ${
+          isDark ? 'text-stone-400' : 'text-stone-500'
+        }`}>
+          点击外部或右上角按钮返回
+        </p>
+
+        {/* Tap on the rest of screen background exits as well */}
+        <div 
+          onClick={() => setIsExpanded(false)} 
+          className="absolute inset-0 z-0 cursor-pointer" 
+        />
+        
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-2 xl:p-4 overflow-y-auto">
       
@@ -477,6 +567,19 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
           ? 'bg-stone-900/90 border-stone-850 text-stone-100 shadow-xl shadow-black/40' 
           : 'bg-white border-stone-200/80 text-stone-800 shadow-sm'
       }`}>
+
+        {/* Subtle decorative expand button for fullscreen zen mode of mandala */}
+        <button
+          onClick={() => setIsExpanded(true)}
+          className={`absolute top-5 right-5 p-1.5 rounded-xl border opacity-30 hover:opacity-100 transition-all z-30 cursor-pointer hover:scale-105 active:scale-95 ${
+            isDark 
+              ? 'bg-stone-950/40 border-stone-850 hover:bg-stone-800 text-stone-400 hover:text-white' 
+              : 'bg-stone-50 border-stone-200/50 hover:bg-stone-100 text-stone-500 hover:text-stone-900'
+          }`}
+          title="沉浸式全屏放大花纹"
+        >
+          <Maximize2 size={13} />
+        </button>
         
         {/* Subtle decorative metallic side rails for high-end feel */}
         <div className={`absolute top-8 left-0 bottom-8 w-[2px] bg-gradient-to-b from-transparent to-transparent pointer-events-none ${
@@ -575,7 +678,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                      breathingPhase === 'Hold' ? '屏气' :
                      '呼气'}
                   </span>
-                  <div className={`text-[10px] font-bold tracking-wider mt-2 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                  <div className={`text-xs font-bold tracking-wider mt-2 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
                     4秒 节奏引导
                   </div>
                 </div>
@@ -603,7 +706,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                 {/* 3. BOTTOM SECTION: Navigation control */}
                 <button 
                   onClick={cycleMode}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all active:scale-95 border z-10 ${
+                  className={`px-3.5 py-2 rounded-full text-xs font-semibold transition-all active:scale-95 border z-10 ${
                     isDark 
                       ? 'bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700' 
                       : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border-stone-200/50'
@@ -624,13 +727,16 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             isDark ? 'bg-stone-950 border-stone-850' : 'bg-stone-50 border-stone-200'
           }`}>
             
-            <div className="flex justify-between items-center mb-1.5 text-[10px] font-bold uppercase tracking-wider">
-              <span className={`px-2.5 py-0.5 rounded-lg border transition-colors ${
-                isDark 
-                  ? 'text-amber-450 bg-amber-950/40 border-amber-900/60' 
-                  : 'text-amber-700 bg-amber-50 border-amber-250/50'
-              }`}>
-                {breathingGuide ? '助眠呼吸引导' : animationMode === 'nested-zoom' ? '绚丽嵌套缩放' : '静态背景'}
+            <div className="flex justify-between items-center mb-1.5 text-xs font-bold uppercase tracking-wider">
+              <span 
+                onClick={cycleMode}
+                className={`px-2.5 py-0.5 rounded-lg border transition-colors cursor-pointer select-none hover:border-amber-500/50 ${
+                  isDark 
+                    ? 'text-amber-450 bg-amber-950/40 border-amber-900/60' 
+                    : 'text-amber-700 bg-amber-50 border-amber-250/50'
+                }`}
+              >
+                {breathingGuide ? '助眠呼吸引导' : animationMode === 'nested-zoom' ? '动态效果' : '静态背景'}
               </span>
               <div className={`flex items-center gap-1 transition-colors ${isDark ? 'text-stone-400' : 'text-stone-400'}`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-amber-600 animate-pulse' : 'bg-stone-300'}`} />
@@ -639,24 +745,14 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             </div>
 
              {/* Glowing amber digital display for track title */}
-            <h3 className={`text-sm font-bold tracking-wide font-sans truncate mb-1 transition-colors ${
+            <h3 className={`text-base font-extrabold tracking-wide font-sans truncate mb-1 transition-colors ${
               isDark ? 'text-stone-100' : 'text-stone-800'
             }`}>
               {activeTrack.name}
             </h3>
 
-            {/* Sub-status scroll text displaying playing white noises */}
-            <div className={`text-[10px] font-medium truncate transition-colors ${
-              isDark ? 'text-stone-400' : 'text-stone-500'
-            }`}>
-              {Object.keys(activeTrack.sounds).map(id => {
-                const s = AVAILABLE_ASMR_SOUNDS.find(x => x.id === id);
-                return s ? s.name.split(' ')[0] : id;
-              }).join(' + ') || '纯净寂静'}
-            </div>
-
             {/* Time status countdown segment bar */}
-            <div className={`mt-3 border-t pt-2 flex justify-center items-center text-[10px] font-mono transition-colors ${
+            <div className={`mt-3 border-t pt-2 flex justify-center items-center text-xs font-mono transition-colors ${
               isDark ? 'border-stone-850 text-stone-400' : 'border-stone-150 text-stone-500'
             }`}>
               <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full border transition-colors ${
@@ -712,7 +808,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             
             {/* Sleeper companion dropdown selectors */}
             <div className="flex items-center justify-between gap-4">
-              <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors ${
+              <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors ${
                 isDark ? 'text-stone-400' : 'text-stone-500'
               }`}>
                 <Disc size={11} className="text-amber-600" />
@@ -721,7 +817,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
               <select
                 value={selectedMandalaId}
                 onChange={(e) => setSelectedMandalaId(e.target.value)}
-                className={`border rounded-xl px-2 py-1 text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-amber-600 max-w-[150px] shadow-sm ml-auto transition-colors ${
+                className={`border rounded-xl px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-600 max-w-[150px] shadow-sm ml-auto transition-colors ${
                   isDark 
                     ? 'bg-stone-900 border-stone-800 text-stone-200' 
                     : 'bg-white border-stone-250 text-stone-800'
@@ -738,7 +834,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             <div className={`space-y-2 border-t pt-2.5 transition-colors ${
               isDark ? 'border-stone-850' : 'border-stone-201/50'
             }`}>
-              <label className={`text-[10px] font-bold uppercase tracking-wider block flex items-center gap-1.5 transition-colors ${
+              <label className={`text-xs font-bold uppercase tracking-wider block flex items-center gap-1.5 transition-colors ${
                 isDark ? 'text-stone-400' : 'text-stone-500'
               }`}>
                 <Moon size={11} className="text-amber-600" />
@@ -760,7 +856,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                           setCustomMinutes('');
                         }
                       }}
-                      className={`py-1.5 rounded-lg text-[10px] font-semibold transition-all border ${
+                      className={`py-1.5 rounded-lg text-xs font-semibold transition-all border ${
                         isActive
                           ? 'bg-amber-600 text-white border-amber-500 font-bold'
                           : isDark
@@ -776,7 +872,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
 
               {/* Custom input line - explicitly requested */}
               <div className="flex items-center gap-2 mt-1.5">
-                <span className={`text-[10px] whitespace-nowrap font-medium transition-colors ${
+                <span className={`text-xs whitespace-nowrap font-medium transition-colors ${
                   isDark ? 'text-stone-400' : 'text-stone-500'
                 }`}>
                   自定义时长:
@@ -804,7 +900,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                         : 'bg-white border-stone-250 text-stone-800 placeholder-stone-400'
                     }`}
                   />
-                  <span className={`absolute right-3 text-[10px] font-bold ${
+                  <span className={`absolute right-3 text-xs font-bold ${
                     isDark ? 'text-stone-500' : 'text-stone-400'
                   }`}>
                     分钟

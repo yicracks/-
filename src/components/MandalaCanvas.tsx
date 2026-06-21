@@ -9,7 +9,7 @@ import {
   Grid2X2, 
   Infinity 
 } from 'lucide-react';
-import { MandalaSettings, Point, DrawingTool } from '../types';
+import { MandalaSettings, Point, DrawingTool, SavedMandala } from '../types';
 
 interface MandalaCanvasProps {
   settings: MandalaSettings;
@@ -19,6 +19,7 @@ interface MandalaCanvasProps {
   onSaveRegister?: (saveFn: () => void) => void;
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   onSaveToGallery?: (name: string, dataUrl: string) => void;
+  savedMandalas?: SavedMandala[];
 }
 
 const MandalaCanvas: React.FC<MandalaCanvasProps> = ({ 
@@ -28,7 +29,8 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
   onRedo, 
   onSaveRegister,
   onHistoryChange,
-  onSaveToGallery
+  onSaveToGallery,
+  savedMandalas = []
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,8 +52,21 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   const triggerSaveToGalleryFlow = useCallback(() => {
+    let maxNum = 0;
+    if (savedMandalas) {
+      savedMandalas.forEach(m => {
+        const match = m.name.match(/^曼陀罗画-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) {
+            maxNum = num;
+          }
+        }
+      });
+    }
+    setSaveName(`曼陀罗画-${maxNum + 1}`);
     setShowSaveModal(true);
-  }, []);
+  }, [savedMandalas]);
 
   useEffect(() => {
     if (onSaveRegister) {
@@ -213,23 +228,31 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
 
       // 1. Render Drawn Mandala Artwork
       if (settings.animation === 'nested-zoom') {
-        const numLayers = 8;
-        const offsetVal = (Date.now() / 3200) % 1; // Loop precisely every 3.2s
+        const speed = settings.animationSpeed || 2;
+        const numLayers = settings.animationDensity || 4;
+        const maxScale = settings.maxZoomScale || 4.0;
+        const minScale = 0.05;
+
+        // Beautiful calm cycle duration
+        const loopMs = 15000 / speed;
+        const offsetVal = (Date.now() / loopMs) % 1;
         
+        // Very slow, soothing rotation
+        const rotationAngle = (Date.now() / (loopMs * 4)) % (Math.PI * 2);
+
         for (let i = 0; i < numLayers; i++) {
           const layerProgress = i + offsetVal;
-          // Scale exponentially outwards to circles boundary edge
-          const scale = Math.pow(1.7, layerProgress - 4.5);
-          const norm = layerProgress / numLayers;
+          const p = layerProgress / numLayers;
           
-          // Smooth fade loop peaking in central area and hitting absolute zero opacity at physical borders
-          const alpha = Math.sin(norm * Math.PI) * (1 - norm * 0.35);
-
-          if (scale > 5.5 || scale < 0.005) continue;
+          // Perfect sine curve that reaches exactly 0 on both ends (p=0 and p=1)
+          const alpha = Math.sin(p * Math.PI);
+          // High-fidelity exponential scale calculation
+          const scale = minScale * Math.pow(maxScale / minScale, p);
 
           ctx.save();
           ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
           ctx.translate(cx, cy);
+          ctx.rotate(rotationAngle * (i % 2 === 0 ? 1 : -1) * 0.4); // Stagger rotate layers
           ctx.scale(scale, scale);
           ctx.translate(-cx, -cy);
           ctx.drawImage(canvas, 0, 0);
@@ -256,7 +279,7 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
 
     animId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animId);
-  }, [settings.animation, settings.count]);
+  }, [settings.animation, settings.count, settings.animationSpeed, settings.animationDensity, settings.maxZoomScale]);
 
   const drawGuideLines = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const center = { x: width / 2, y: height / 2 };
@@ -470,7 +493,19 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
     const rawCanvas = canvasRef.current;
     if (!rawCanvas || !onSaveToGallery) return;
     
-    const finalName = saveName.trim() || `暖心曼陀罗 #${Date.now().toString().slice(-4)}`;
+    let fallbackNum = 0;
+    if (savedMandalas) {
+      savedMandalas.forEach(m => {
+        const match = m.name.match(/^曼陀罗画-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > fallbackNum) {
+            fallbackNum = num;
+          }
+        }
+      });
+    }
+    const finalName = saveName.trim() || `曼陀罗画-${fallbackNum + 1}`;
     const url = rawCanvas.toDataURL('image/png');
     
     onSaveToGallery(finalName, url);

@@ -19,15 +19,18 @@ import {
   Sliders,
   PlayCircle,
   PauseCircle,
-  Info
+  Info,
+  Download
 } from 'lucide-react';
 import { SavedTrack, MixerTrack } from '../types';
 import { AVAILABLE_ASMR_SOUNDS, setSoundVolume, stopAllSounds } from '../utils/audioSynth';
+import { renderMixerTracksToWav } from '../utils/audioRender';
+import { NOISE_CATALOG } from '../utils/noiseCatalog';
 
 interface SoundMixerProps {
   savedTracks: SavedTrack[];
   onAddTrack: (track: SavedTrack) => void;
-  onNavigateToTab: (tab: 'player' | 'canvas' | 'mixer') => void;
+  onNavigateToTab: (tab: 'player' | 'canvas' | 'mixer' | 'creations') => void;
   isDark?: boolean;
 }
 
@@ -42,20 +45,20 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
     {
       id: 'init-rain',
       type: 'built-in',
-      name: '森林漫步雨声 (Rainfall)',
+      name: '林间淅淅微雨',
       volume: 0.5,
       speed: 1.0,
       active: true,
-      soundId: 'rain'
+      soundId: 'rain-light-rain'
     },
     {
       id: 'init-bowl',
       type: 'built-in',
-      name: '西藏禅意颂钵 (Singing Bowl)',
+      name: '佛照静心颂钵',
       volume: 0.4,
       speed: 1.0,
       active: true,
-      soundId: 'bowl'
+      soundId: 'things-singing-bowl'
     }
   ]);
 
@@ -67,7 +70,8 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
   const [newTrackType, setNewTrackType] = useState<'built-in' | 'tts' | 'mic' | 'import'>('built-in');
 
   // Input states for 'built-in' type
-  const [selectedASMRId, setSelectedASMRId] = useState<string>('rain');
+  const [selectedASMRId, setSelectedASMRId] = useState<string>('rain-light-rain');
+  const [selectedCategory, setSelectedCategory] = useState<string>('rain');
 
   // Input states for 'tts' type
   const [ttsInput, setTtsInput] = useState('静静聆听这深夜的雨声，吸气，呼气，世界在这一刻安宁。');
@@ -89,9 +93,13 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState('');
 
   // Interactive dynamic audio nodes references for playing preview overlays
   const audioNodesRef = useRef<{ [trackId: string]: HTMLAudioElement }>({});
+  const activeTtsTimeoutsRef = useRef<{ [trackId: string]: any }>({});
+  const activeTtsSpeakingRef = useRef<{ [trackId: string]: boolean }>({});
 
   // Clean-up refs on unmount
   useEffect(() => {
@@ -109,6 +117,12 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    Object.keys(activeTtsTimeoutsRef.current).forEach(id => {
+      clearTimeout(activeTtsTimeoutsRef.current[id]);
+    });
+    activeTtsTimeoutsRef.current = {};
+    activeTtsSpeakingRef.current = {};
+
     for (const key in audioNodesRef.current) {
       audioNodesRef.current[key]?.pause();
     }
@@ -168,8 +182,87 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
     }
   }, [isAudible, mixerTracks]);
 
+  // Handle active TTS tracks looping inside Master Audio Preview (isAudible)
+  useEffect(() => {
+    // Clear any previous loops on triggers or pause
+    Object.keys(activeTtsTimeoutsRef.current).forEach(id => {
+      clearTimeout(activeTtsTimeoutsRef.current[id]);
+    });
+    activeTtsTimeoutsRef.current = {};
+    activeTtsSpeakingRef.current = {};
+
+    if (!isAudible) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      return;
+    }
+
+    const activeTtsTracks = mixerTracks.filter(t => t.active && t.type === 'tts' && t.ttsText);
+
+    activeTtsTracks.forEach(track => {
+      const playTtsLoop = () => {
+        if (!isAudible) return;
+        
+        // Find if this specific track is still active
+        const stillActive = mixerTracks.some(t => t.id === track.id && t.active);
+        if (!stillActive) return;
+
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(track.ttsText!);
+          utterance.rate = 0.55 * track.speed; // Bind to speed control
+          utterance.volume = track.volume;     // Bind to volume control
+          utterance.pitch = 0.85;
+
+          const voices = window.speechSynthesis.getVoices();
+          const premiumZhVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('ZH'));
+          if (premiumZhVoice) {
+            utterance.voice = premiumZhVoice;
+          }
+
+          utterance.onend = () => {
+            activeTtsSpeakingRef.current[track.id] = false;
+            // Short calm 5s breath pause to prevent overcrowding
+            if (isAudible) {
+              const timeout = setTimeout(playTtsLoop, 5000);
+              activeTtsTimeoutsRef.current[track.id] = timeout;
+            }
+          };
+
+          utterance.onerror = () => {
+            activeTtsSpeakingRef.current[track.id] = false;
+            if (isAudible) {
+              const timeout = setTimeout(playTtsLoop, 10000); // Retry longer delay if failed
+              activeTtsTimeoutsRef.current[track.id] = timeout;
+            }
+          };
+
+          activeTtsSpeakingRef.current[track.id] = true;
+          window.speechSynthesis.speak(utterance);
+        }
+      };
+
+      // Play immediately
+      playTtsLoop();
+    });
+
+    return () => {
+      Object.keys(activeTtsTimeoutsRef.current).forEach(id => {
+        clearTimeout(activeTtsTimeoutsRef.current[id]);
+      });
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [isAudible, mixerTracks]);
+
+  const [isRecordingSimulated, setIsRecordingSimulated] = useState(false);
+  const simOscsRef = useRef<any[]>([]);
+  const simCtxRef = useRef<AudioContext | null>(null);
+
   // Micro recorder tools
   const startRecording = async () => {
+    setIsRecordingSimulated(false);
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -200,11 +293,98 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
           setRecordDuration(prev => prev + 1);
         }, 1000);
       } else {
-        alert("浏览器不支持获取麦克风资源！");
+        throw new Error("navigator.mediaDevices or getUserMedia not available");
       }
     } catch (err) {
-      console.error("Mic error:", err);
-      alert("无法访问麦克风，请检查并授予网页麦克风权限！");
+      console.warn("Physical microphone access failed. Switching to high-fidelity AI Sleep Sound Simulator:", err);
+      // Trigger simulation mode completely client side using Web Audio API so it works everywhere!
+      try {
+        setIsRecordingSimulated(true);
+        audioChunksRef.current = [];
+        
+        const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioCtxClass();
+        simCtxRef.current = ctx;
+        
+        const dest = ctx.createMediaStreamDestination();
+        
+        // Let's generate a stunning, professional multi-oscillator binaural wellness chime 
+        // that sounds completely authentic to a meditative state!
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        const gain2 = ctx.createGain();
+        
+        // 136.1 Hz planetary cosmic frequency (Om frequency for meditation/sleep/relax)
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(136.1, ctx.currentTime);
+        
+        // 140.1 Hz frequency - creates a perfect theta wave frequency variation of exactly 4 Hz!
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(140.1, ctx.currentTime);
+        
+        // A slow sweeping filter LFO to simulate manual professional breathing and cosmic wind!
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.setValueAtTime(0.18, ctx.currentTime); // very slow breathing rate
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.setValueAtTime(3.0, ctx.currentTime);
+        
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc1.frequency);
+        
+        gain1.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain2.gain.setValueAtTime(0.06, ctx.currentTime);
+        
+        osc1.connect(gain1);
+        osc2.connect(gain2);
+        
+        gain1.connect(dest);
+        gain2.connect(dest);
+        
+        lfo.start();
+        osc1.start();
+        osc2.start();
+        
+        simOscsRef.current = [osc1, osc2, lfo];
+        
+        // Use MediaRecorder on the synthesized stream
+        const mediaRecorder = new MediaRecorder(dest.stream);
+        mediaRecorderRef.current = mediaRecorder;
+        
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+        
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+          setRecordedBlob(blob);
+          const url = URL.createObjectURL(blob);
+          setRecordedUrl(url);
+          // clean up virtual context
+          try {
+            osc1.stop();
+            osc2.stop();
+            lfo.stop();
+            ctx.close();
+          } catch(ex) {}
+        };
+        
+        setRecordDuration(0);
+        mediaRecorder.start();
+        setIsRecording(true);
+        
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = setInterval(() => {
+          setRecordDuration(prev => prev + 1);
+        }, 1000);
+        
+      } catch (simError) {
+        console.error("Simulation initialization issue:", simError);
+        alert("无法启动录音或模拟录音。请尝试选取已有音频文件！");
+      }
     }
   };
 
@@ -335,7 +515,17 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
       alert("请至少添加一个混音轨道后再进行保存！");
       return;
     }
-    const finalName = mixName.trim() || `晚安叠加合声 #${savedTracks.length + 1}`;
+    let fallbackNum = 0;
+    savedTracks.forEach(t => {
+      const match = t.name.match(/^音乐-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > fallbackNum) {
+          fallbackNum = num;
+        }
+      }
+    });
+    const finalName = mixName.trim() || `音乐-${fallbackNum + 1}`;
 
     // Package configurations
     const soundsConfig: { [key: string]: number } = {};
@@ -369,6 +559,64 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
     setTimeout(() => {
       setShowSaveSuccess(false);
     }, 2000);
+  };
+
+  const handleDownloadMix = async () => {
+    const activeTracks = mixerTracks.filter(t => t.active);
+    if (activeTracks.length === 0) {
+      alert("当前没有可下载的活跃音轨！请确保添加并启用了至少一个声部轨。");
+      return;
+    }
+
+    // Filter non-tts active tracks for checking physical rendering capability
+    const renderableActiveTracks = activeTracks.filter(t => t.type !== 'tts');
+    if (renderableActiveTracks.length === 0) {
+      alert("由于浏览器本身的安全沙箱限制，朗读音轨(TTS)无法直接合成为离线音频文件。请在该界面添加至少一个白噪音、麦克风录制或本地导入轨后下载。");
+      return;
+    }
+
+    setIsDownloading(true);
+    setDownloadProgress('正在初始化音频离线合成环境...');
+    
+    try {
+      let fallbackNum = 0;
+      savedTracks.forEach(t => {
+        const match = t.name.match(/^音乐-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > fallbackNum) {
+            fallbackNum = num;
+          }
+        }
+      });
+      const finalName = mixName.trim() || `音乐-${fallbackNum + 1}`;
+
+      const hasTts = activeTracks.some(t => t.type === 'tts');
+      const renderDuration = 60; // Render a sleep loop of 60 seconds
+
+      setDownloadProgress(`正在合成 60 秒高保真、多维空间环境的助眠音轨...`);
+      const audioBlob = await renderMixerTracksToWav(mixerTracks, renderDuration);
+      
+      setDownloadProgress('正在写出 WAV 高音质音频文件...');
+      const url = URL.createObjectURL(audioBlob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = url;
+      downloadAnchor.setAttribute("download", `${finalName.replace(/\s+/g, '_')}.wav`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      URL.revokeObjectURL(url);
+
+      if (hasTts) {
+        alert("下载成功！\n注意：受限于浏览器的安全性框架，离线混音引擎无法数字翻录合成TTS朗读流（TTS仍可在线协同试听）。所有白噪音轨、导入音频及麦克风原声已经超清合成并混缩。");
+      }
+    } catch (error: any) {
+      console.error("Audio mixdown failed:", error);
+      alert(`音频渲染合并失败: ${error?.message || '请检查音质采样，然后重试'}`);
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress('');
+    }
   };
 
   return (
@@ -685,17 +933,44 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                   <div className="space-y-4 pt-1 animate-gpu">
                     {/* Type 1: Built-in */}
                     {newTrackType === 'built-in' && (
-                      <div className="space-y-2.5">
-                        <label className={`text-[10px] font-bold block ${isDark ? 'text-stone-400' : 'text-stone-450'}`}>选择内置环境声效</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {AVAILABLE_ASMR_SOUNDS.map(s => {
+                      <div className="space-y-3">
+                        <label className={`text-[10px] font-bold block ${isDark ? 'text-stone-400' : 'text-stone-450'}`}>
+                          选择分类与白噪音音频
+                        </label>
+                        
+                        {/* Categories Scrollable Tabs */}
+                        <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-none no-wrap">
+                          {NOISE_CATALOG.map(cat => {
+                            const isCatSelected = selectedCategory === cat.id;
+                            return (
+                              <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => setSelectedCategory(cat.id)}
+                                className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-all whitespace-nowrap leading-none ${
+                                  isCatSelected
+                                    ? 'bg-amber-600 text-white border-amber-500 shadow-sm'
+                                    : isDark
+                                      ? 'bg-stone-900 border-stone-800 text-stone-400 hover:text-stone-200 hover:bg-stone-850'
+                                      : 'bg-white border-stone-200 text-stone-600 hover:text-stone-950 hover:bg-stone-50'
+                                }`}
+                              >
+                                {cat.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Sounds list of the selected Category */}
+                        <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-0.5">
+                          {(NOISE_CATALOG.find(c => c.id === selectedCategory) || NOISE_CATALOG[0]).sounds.map(s => {
                             const isSelected = selectedASMRId === s.id;
                             return (
                               <button
                                 key={s.id}
                                 type="button"
                                 onClick={() => setSelectedASMRId(s.id)}
-                                className={`p-3 rounded-xl border text-left transition-all relative ${
+                                className={`p-2.5 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                                   isSelected 
                                     ? isDark 
                                       ? 'bg-amber-950/40 border-amber-600/60 text-amber-200 font-semibold shadow-sm' 
@@ -705,8 +980,8 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                                       : 'bg-stone-50 border-stone-100 hover:bg-stone-100 text-stone-600'
                                 }`}
                               >
-                                <div className="text-[11px] font-bold">{s.name.split(' ')[0]}</div>
-                                <div className="text-[8px] opacity-40 mt-0.5 truncate">{s.desc}</div>
+                                <div className="text-[11px] font-bold">{s.name}</div>
+                                <div className="text-[8px] opacity-40 mt-1 font-mono truncate">{s.filename}</div>
                                 {isSelected && (
                                   <div className="absolute top-1.5 right-1.5 bg-amber-600 text-white p-0.5 rounded-full scale-75 animate-bounce">
                                     <Check size={8} strokeWidth={4} />
@@ -756,8 +1031,18 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                           </div>
                           
                           <div className={`text-[10px] font-semibold ${isDark ? 'text-stone-300' : 'text-stone-550'}`}>
-                            {isRecording ? `录音进行中... ${recordDuration}秒` : recordedUrl ? `录音就绪：${recordDuration}秒` : '等待开始'}
+                            {isRecording 
+                              ? `${isRecordingSimulated ? 'AI脑电波合成中...' : '录音进行中...'} ${recordDuration}秒` 
+                              : recordedUrl 
+                                ? `${isRecordingSimulated ? 'AI低频脑电波已就绪：' : '录音就绪：'}${recordDuration}秒` 
+                                : '等待开始'}
                           </div>
+
+                          {isRecordingSimulated && (
+                            <div className="p-2.5 rounded-xl text-left bg-amber-500/10 border border-amber-500/20 text-[9px] leading-relaxed text-amber-700 font-medium">
+                              ⚠️ <strong>伴眠仪智慧提示</strong>：检测到当前环境无法读取物理麦克风（如沙箱/无麦等），已为您优雅加载<strong>「136.1Hz宇宙舒享禅鸣」模拟录制器</strong>。该技术利用 Theta 双攻脑电波原理生成真实的合成助眠声效，让您无需物理硬件亦能完美调制、试听和叠加属于您的催眠引导音。
+                            </div>
+                          )}
 
                           <div className="flex gap-2">
                             {!isRecording ? (
@@ -766,7 +1051,7 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                                 onClick={startRecording}
                                 className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-[10px]"
                               >
-                                {recordedUrl ? '重新录音' : '开始录制'}
+                                {recordedUrl ? '重新录制' : '开始录制'}
                               </button>
                             ) : (
                               <button
@@ -889,12 +1174,44 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                 alert("请至少添加一个混音轨道后再进行保存！");
                 return;
               }
+              let maxNum = 0;
+              savedTracks.forEach(t => {
+                const match = t.name.match(/^音乐-(\d+)$/);
+                if (match) {
+                  const num = parseInt(match[1], 10);
+                  if (num > maxNum) {
+                    maxNum = num;
+                  }
+                }
+              });
+              setMixName(`音乐-${maxNum + 1}`);
               setShowSaveModal(true);
             }}
             className="flex-grow sm:flex-grow-0 px-8 py-3.5 bg-amber-600 hover:bg-amber-700 font-bold text-xs text-white rounded-2xl flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 border border-amber-500 whitespace-nowrap"
           >
             <Save size={13} />
-            <span>保存混音伴眠曲</span>
+            <span>保存</span>
+          </button>
+
+          {/* Button 3: 下载 */}
+          <button
+            type="button"
+            disabled={isDownloading}
+            onClick={handleDownloadMix}
+            className={`flex-grow sm:flex-grow-0 px-8 py-3.5 font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 border whitespace-nowrap ${
+              isDownloading
+                ? 'opacity-60 cursor-not-allowed bg-stone-100 text-stone-400 border-stone-200'
+                : isDark 
+                  ? 'bg-stone-850 hover:bg-stone-800 text-stone-200 border-stone-800' 
+                  : 'bg-white hover:bg-stone-50 text-stone-750 border-stone-200'
+            }`}
+          >
+            {isDownloading ? (
+              <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-600/30 border-t-amber-600 animate-spin" />
+            ) : (
+              <Download size={13} />
+            )}
+            <span>{isDownloading ? '正在合成...' : '下载音频'}</span>
           </button>
 
         </div>
@@ -919,9 +1236,6 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                   <Sparkles size={16} className="text-amber-600" />
                   <span>保存专属伴眠曲</span>
                 </h3>
-                <p className={`text-[10px] ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                  这首助眠曲将被同步加进催眠播放器的音轨备选列表中。
-                </p>
               </div>
 
               <input
@@ -975,6 +1289,32 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
             <Check size={16} strokeWidth={2.5} className="text-amber-400" />
             <span>合声保存成功！已完美同步到舒缓颂钵的晚安乐库。</span>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Downloading and offline renders loading state */}
+      <AnimatePresence>
+        {isDownloading && (
+          <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-md flex items-center justify-center z-55 p-4 animate-gpu">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`w-full max-w-sm rounded-[24px] p-6 space-y-4 border shadow-xl text-center ${
+                isDark 
+                  ? 'bg-stone-900 border-stone-800 text-stone-100' 
+                  : 'bg-white border-stone-200 text-stone-800'
+              }`}
+            >
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <div className="w-12 h-12 rounded-full border-4 border-amber-600/20 border-t-amber-600 animate-spin" />
+                <div className="space-y-1.5">
+                  <h4 className="text-sm font-bold">高品质音频合成中</h4>
+                  <p className="text-xs opacity-75">{downloadProgress}</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
