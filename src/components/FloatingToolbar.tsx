@@ -15,26 +15,28 @@ import {
   Wind
 } from 'lucide-react';
 import { MandalaSettings, DrawingTool } from '../types';
+import { Lang, t } from '../utils/i18n';
 
 interface FloatingToolbarProps {
   settings: MandalaSettings;
   setSettings: React.Dispatch<React.SetStateAction<MandalaSettings>>;
   isDark?: boolean;
+  lang?: Lang;
 }
 
-const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ settings, setSettings, isDark = false }) => {
+const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ settings, setSettings, isDark = false, lang = 'en' as Lang }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   const tools: { id: DrawingTool; icon: React.ReactNode; label: string }[] = [
-    { id: 'brush', icon: <Pencil size={14} />, label: '画笔 (Brush)' },
-    { id: 'line', icon: <Minus size={14} />, label: '直线 (Line)' },
-    { id: 'curve', icon: <Wind size={14} />, label: '弧线 (Curve)' },
-    { id: 'circle', icon: <Circle size={14} />, label: '圆形 (Circle)' },
-    { id: 'ellipse', icon: <Orbit size={14} />, label: '椭圆 (Ellipse)' },
-    { id: 'rect', icon: <Square size={14} />, label: '矩形 (Rectangle)' },
-    { id: 'leaf', icon: <Pentagon size={14} />, label: '花叶 (Leaf)' },
-    { id: 'star', icon: <Star size={14} />, label: '精细星芒 (Star)' },
-    { id: 'moon', icon: <Moon size={14} />, label: '月晕 (Moon)' },
+    { id: 'brush', icon: <Pencil size={14} />, label: t(lang, 'tool.brush') },
+    { id: 'line', icon: <Minus size={14} />, label: t(lang, 'tool.line') },
+    { id: 'curve', icon: <Wind size={14} />, label: t(lang, 'tool.curve') },
+    { id: 'circle', icon: <Circle size={14} />, label: t(lang, 'tool.circle') },
+    { id: 'ellipse', icon: <Orbit size={14} />, label: t(lang, 'tool.ellipse') },
+    { id: 'rect', icon: <Square size={14} />, label: t(lang, 'tool.rect') },
+    { id: 'leaf', icon: <Pentagon size={14} />, label: t(lang, 'tool.leaf') },
+    { id: 'star', icon: <Star size={14} />, label: t(lang, 'tool.star') },
+    { id: 'moon', icon: <Moon size={14} />, label: t(lang, 'tool.moon') },
   ];
 
   if (!isVisible) {

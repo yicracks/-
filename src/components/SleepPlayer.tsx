@@ -109,6 +109,43 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
   const [breathingGuide, setBreathingGuide] = useState(false);
   const [breathingPhase, setBreathingPhase] = useState<'Inhale' | 'Hold' | 'Exhale'>('Inhale');
 
+  const [preloadTracks, setPreloadTracks] = useState<SavedTrack[]>(PRELOADED_SLEEP_TRACKS);
+
+  // Fetch dynamic BGM list and construct the soundtracks
+  useEffect(() => {
+    fetch('/api/bgm-list')
+      .then(res => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then((data: Array<{ filename: string; name: string; url: string }>) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const dynamicTracks = data.map((item, idx) => {
+            const match = PRELOADED_SLEEP_TRACKS.find(t => 
+              t.customAudioDataUrl?.includes(item.filename) || t.customAudioName === item.filename
+            );
+            if (match) {
+              return {
+                ...match,
+                customAudioDataUrl: item.url
+              };
+            }
+            return {
+              id: `track-dynamic-bgm-${idx}-${item.filename}`,
+              name: item.name,
+              sounds: {},
+              customAudioName: item.filename,
+              customAudioDataUrl: item.url
+            };
+          });
+          setPreloadTracks(dynamicTracks);
+        }
+      })
+      .catch(err => {
+        console.warn("Could not load dynamic BGM list, using predefined offline tracks:", err);
+      });
+  }, []);
+
   const [sessionElapsed, setSessionElapsed] = useState<number>(0);
 
   // Time-decay tick loop for the volume fade-out action
@@ -165,7 +202,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
   const activeMixerAudioNodesRef = useRef<{ [trackId: string]: HTMLAudioElement }>({});
 
   // Combine default preset paths with user drafts
-  const allTracks = [...PRELOADED_SLEEP_TRACKS, ...savedTracks];
+  const allTracks = [...preloadTracks, ...savedTracks];
   const activeTrack = allTracks.find(t => t.id === activeTrackId) || allTracks[0];
 
   // Sync state to Web Audio Synthesizer plus custom tracks
@@ -380,23 +417,30 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
     imgObj.src = getSelectedMandalaSrc();
 
     const startLoop = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-
-      const width = parent.clientWidth;
-      const height = parent.clientHeight;
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
-      }
-
-      const cx = width / 2;
-      const cy = height / 2;
-
       const drawFrame = () => {
-        ctx.clearRect(0, 0, width, height);
+        const parent = canvas.parentElement;
+        if (!parent) return;
+
+        const w = parent.clientWidth;
+        const h = parent.clientHeight;
+        
+        // Handle initial zero-width/height gracefully to prevent division-by-zero or scaling bugs
+        if (w === 0 || h === 0) {
+          animId = requestAnimationFrame(drawFrame);
+          return;
+        }
+
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+          canvas.style.width = `${w}px`;
+          canvas.style.height = `${h}px`;
+        }
+
+        const cx = w / 2;
+        const cy = h / 2;
+
+        ctx.clearRect(0, 0, w, h);
 
         if (!imgObj.complete) {
           ctx.save();
@@ -452,7 +496,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
         } else {
           // Static Presentation mode
           ctx.save();
-          const targetSize = Math.min(width, height) * 0.95;
+          const targetSize = Math.min(w, h) * 0.95;
           
           // Outer clip
           ctx.beginPath();
@@ -559,10 +603,10 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
   }
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-2 xl:p-4 overflow-y-auto">
+    <div className="w-full min-h-full flex flex-col items-center justify-start md:justify-center p-1 sm:p-4 overflow-y-auto">
       
       {/* Standalone Physical styled CD Deck Container */}
-      <div className={`w-full max-w-[530px] border rounded-[38px] p-6 shadow-md flex flex-col items-center relative overflow-hidden transition-colors duration-300 ${
+      <div className={`w-full max-w-[530px] border rounded-[28px] xs:rounded-[38px] p-4 xs:p-6 shadow-md flex flex-col items-center relative overflow-hidden transition-colors duration-300 ${
         isDark 
           ? 'bg-stone-900/90 border-stone-850 text-stone-100 shadow-xl shadow-black/40' 
           : 'bg-white border-stone-200/80 text-stone-800 shadow-sm'
@@ -571,7 +615,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
         {/* Subtle decorative expand button for fullscreen zen mode of mandala */}
         <button
           onClick={() => setIsExpanded(true)}
-          className={`absolute top-5 right-5 p-1.5 rounded-xl border opacity-30 hover:opacity-100 transition-all z-30 cursor-pointer hover:scale-105 active:scale-95 ${
+          className={`absolute top-4 right-4 p-1.5 rounded-xl border opacity-30 hover:opacity-100 transition-all z-30 cursor-pointer hover:scale-105 active:scale-95 ${
             isDark 
               ? 'bg-stone-950/40 border-stone-850 hover:bg-stone-800 text-stone-400 hover:text-white' 
               : 'bg-stone-50 border-stone-200/50 hover:bg-stone-100 text-stone-500 hover:text-stone-900'
@@ -590,7 +634,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
         }`} />
 
         {/* 1. UPPER SECTION: The Premium CD Compartment Door */}
-        <div className={`relative w-full aspect-square max-w-[420px] rounded-full p-3 shadow-inner border flex items-center justify-center group mb-6 transition-colors duration-300 ${
+        <div className={`relative w-full aspect-square max-w-[180px] xs:max-w-[270px] sm:max-w-[340px] md:max-w-[390px] rounded-full p-2 xs:p-3 shadow-inner border flex items-center justify-center group mb-4 xs:mb-6 transition-colors duration-300 ${
           isDark ? 'bg-stone-950 border-stone-850' : 'bg-stone-50 border-stone-200'
         }`}>
           
@@ -621,13 +665,13 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
             <canvas ref={playerCanvasRef} className="absolute inset-0 block pointer-events-none w-full h-full" />
             
             {/* Standard CD inner hub silver ring groove decoration */}
-            <div className={`absolute w-[130px] h-[130px] rounded-full border backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-15 transition-colors ${
+            <div className={`absolute w-[70px] xs:w-[130px] h-[70px] xs:h-[130px] rounded-full border backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-15 transition-colors ${
               isDark ? 'border-stone-800 bg-stone-900/50' : 'border-stone-200 bg-white/50'
             }`}>
-              <div className={`w-[100px] h-[100px] rounded-full border border-dashed flex items-center justify-center ${
+              <div className={`w-[54px] xs:w-[100px] h-[54px] xs:h-[100px] rounded-full border border-dashed flex items-center justify-center ${
                 isDark ? 'border-stone-700' : 'border-stone-200'
               }`}>
-                <div className={`w-[58px] h-[58px] rounded-full border ${
+                <div className={`w-[30px] xs:w-[58px] h-[30px] xs:h-[58px] rounded-full border ${
                   isDark ? 'bg-stone-950 border-stone-800/50' : 'bg-stone-100 border-stone-200/50'
                 }`} />
               </div>
@@ -637,19 +681,19 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
           {/* The Magnetic Center Spindle lock cap (CD机中心的固定卡轴水晶柱 - Click to Toggle Mode) */}
           <button
             onClick={cycleMode}
-            className={`absolute w-14 h-14 rounded-full border hover:border-amber-500 hover:scale-105 shadow-sm flex items-center justify-center z-35 cursor-pointer active:scale-95 transition-all group ${
+            className={`absolute w-8 xs:w-14 h-8 xs:h-14 rounded-full border hover:border-amber-500 hover:scale-105 shadow-sm flex items-center justify-center z-35 cursor-pointer active:scale-95 transition-all group ${
               isDark 
                 ? 'bg-gradient-to-r from-stone-850 via-stone-800 to-stone-900 border-stone-700' 
                 : 'bg-gradient-to-r from-stone-100 via-stone-50 to-stone-200 border-stone-300'
             }`}
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-inner relative ${
+            <div className={`w-6 xs:w-10 h-6 xs:h-10 rounded-full flex items-center justify-center shadow-inner relative ${
               isDark ? 'bg-gradient-to-tr from-stone-800 to-stone-700' : 'bg-gradient-to-tr from-stone-200 to-stone-100'
             }`}>
-              <div className={`w-4 h-4 rounded-full shadow-sm flex items-center justify-center ${
+              <div className={`w-3 xs:w-4 h-3 xs:h-4 rounded-full shadow-sm flex items-center justify-center ${
                 isDark ? 'bg-stone-900' : 'bg-stone-300'
               }`}>
-                <span className="w-1.5 h-1.5 bg-amber-600 rounded-full animate-ping" />
+                <span className="w-1 h-1 bg-amber-600 rounded-full animate-ping" />
               </div>
             </div>
           </button>
@@ -661,13 +705,13 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className={`absolute inset-[10px] rounded-full flex flex-col items-center justify-between py-7 backdrop-blur-sm transition-colors duration-300 z-20 ${
+                className={`absolute inset-[6px] xs:inset-[10px] rounded-full flex flex-col items-center justify-between py-4 xs:py-7 backdrop-blur-sm transition-colors duration-300 z-20 ${
                   isDark ? 'bg-stone-950/95' : 'bg-stone-50/95'
                 }`}
               >
                 {/* 1. TOP SECTION: Guiding label outside the circle */}
-                <div className="text-center z-10 select-none mt-2">
-                  <span className={`text-lg sm:text-xl font-extrabold tracking-[0.25em] px-5 py-2 rounded-2xl shadow-sm border transition-all inline-block ${
+                <div className="text-center z-10 select-none mt-1 sm:mt-2">
+                  <span className={`text-base sm:text-xl font-extrabold tracking-[0.25em] px-4 sm:px-5 py-1 sm:py-2 rounded-2xl shadow-sm border transition-all inline-block ${
                     breathingPhase === 'Inhale' 
                       ? isDark ? 'bg-amber-955/40 border-amber-900/50 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-800'
                       : breathingPhase === 'Hold' 
@@ -678,13 +722,13 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                      breathingPhase === 'Hold' ? '屏气' :
                      '呼气'}
                   </span>
-                  <div className={`text-xs font-bold tracking-wider mt-2 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                  <div className={`text-[10px] sm:text-xs font-bold tracking-wider mt-1 sm:mt-2 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
                     4秒 节奏引导
                   </div>
                 </div>
 
                 {/* 2. MIDDLE SECTION: The dynamic pulsing circle (purely empty) */}
-                <div className="relative w-32 h-32 flex items-center justify-center select-none">
+                <div className="relative w-16 xs:w-32 h-16 xs:h-32 flex items-center justify-center select-none">
                   <motion.div
                     key={breathingPhase}
                     initial={{ scale: breathingPhase === 'Inhale' ? 0.4 : 1.0, opacity: 0.3 }}
@@ -693,7 +737,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                       opacity: 0.8
                     }}
                     transition={{ duration: 4, ease: "easeInOut" }}
-                    className={`w-28 h-28 rounded-full border border-dashed transition-all duration-300 ${
+                    className={`w-14 xs:w-28 h-14 xs:h-28 rounded-full border border-dashed transition-all duration-300 ${
                       breathingPhase === 'Inhale' 
                         ? isDark ? 'bg-amber-955/20 border-amber-500/80' : 'bg-amber-50/20 border-amber-305'
                         : breathingPhase === 'Hold' 
@@ -706,7 +750,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                 {/* 3. BOTTOM SECTION: Navigation control */}
                 <button 
                   onClick={cycleMode}
-                  className={`px-3.5 py-2 rounded-full text-xs font-semibold transition-all active:scale-95 border z-10 ${
+                  className={`px-3 py-1 sm:px-3.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-semibold transition-all active:scale-95 border z-10 ${
                     isDark 
                       ? 'bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700' 
                       : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border-stone-200/50'
@@ -720,7 +764,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
         </div>
 
         {/* 2. LOWER SECTION: The Integrated Media Player Console */}
-        <div className="w-full flex flex-col gap-5 z-20">
+        <div className="w-full flex flex-col gap-3 sm:gap-5 z-20">
 
           {/* LED Stereo Display Readout panel (Minimalist design) */}
           <div className={`relative rounded-2xl p-4 shadow-sm overflow-hidden text-center border transition-colors duration-300 ${
@@ -759,7 +803,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                 isDark ? 'bg-stone-900 border-stone-800' : 'bg-stone-100 border-stone-200'
               }`}>
                 <Clock size={11} className="text-amber-600" />
-                <span>{timerLeft !== null ? formatTime(timerLeft) : '未设置定时关机'}</span>
+                <span>{timerLeft !== null ? formatTime(timerLeft) : '未设置定时'}</span>
               </span>
             </div>
           </div>
@@ -838,7 +882,7 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
                 isDark ? 'text-stone-400' : 'text-stone-500'
               }`}>
                 <Moon size={11} className="text-amber-600" />
-                自动关机定时
+                定时
               </label>
               
               <div className="grid grid-cols-4 gap-1.5">
@@ -918,7 +962,6 @@ const SleepPlayer: React.FC<SleepPlayerProps> = ({
               type="button"
               className="text-xs text-amber-700 hover:text-amber-800 transition-all font-semibold inline-flex items-center gap-1 hover:underline"
             >
-              <span>没有满意的音阶？去定制音轨</span>
               <ChevronRight size={12} />
             </button>
           </div>

@@ -7,7 +7,10 @@ import {
   Trash2, 
   FolderHeart, 
   Grid2X2, 
-  Infinity 
+  Infinity,
+  Undo2,
+  Redo2,
+  RefreshCw
 } from 'lucide-react';
 import { MandalaSettings, Point, DrawingTool, SavedMandala } from '../types';
 
@@ -41,6 +44,11 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const startPoint = useRef<Point | null>(null);
   const lastPoint = useRef<Point | null>(null);
+
+  // Dynamic canvas size state to guarantee perfect circular board on all devices
+  const [canvasSize, setCanvasSize] = useState<number>(400);
+  const [canUndoSelf, setCanUndoSelf] = useState(false);
+  const [canRedoSelf, setCanRedoSelf] = useState(false);
 
   // Undo/Redo Stacks
   const historyRef = useRef<ImageData[]>([]);
@@ -90,6 +98,9 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
       }
       historyIndexRef.current = historyRef.current.length - 1;
       
+      setCanUndoSelf(historyIndexRef.current > 0);
+      setCanRedoSelf(false);
+
       if (onHistoryChange) {
         onHistoryChange(historyIndexRef.current > 0, false);
       }
@@ -108,6 +119,10 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.putImageData(state, 0, 0);
     }
+    
+    setCanUndoSelf(historyIndexRef.current > 0);
+    setCanRedoSelf(historyIndexRef.current < historyRef.current.length - 1);
+
     if (onHistoryChange) {
       onHistoryChange(
         historyIndexRef.current > 0,
@@ -156,12 +171,14 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
     const updateSize = () => {
       if (!containerRef.current || !canvasRef.current || !previewCanvasRef.current || !guideCanvasRef.current || !displayCanvasRef.current) return;
       
-      const canvasContainer = canvasRef.current.parentElement;
-      if (!canvasContainer) return;
+      const cWidth = containerRef.current.clientWidth;
+      const cHeight = containerRef.current.clientHeight;
+      if (cWidth === 0 || cHeight === 0) return;
       
-      const width = canvasContainer.clientWidth;
-      const height = canvasContainer.clientHeight;
-      if (width === 0 || height === 0) return;
+      // Reserve space for top undo/redo/clear and bottom save/export.
+      const maxSize = Math.min(cWidth - 24, cHeight - 110);
+      const sizeValue = Math.max(160, maxSize);
+      setCanvasSize(sizeValue);
       
       const canvases = [canvasRef.current, previewCanvasRef.current, guideCanvasRef.current, displayCanvasRef.current];
       
@@ -176,10 +193,10 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
 
       canvases.forEach(c => {
         if (!c) return;
-        c.width = width;
-        c.height = height;
-        c.style.width = `${width}px`;
-        c.style.height = `${height}px`;
+        c.width = sizeValue;
+        c.height = sizeValue;
+        c.style.width = `${sizeValue}px`;
+        c.style.height = `${sizeValue}px`;
       });
       
       const ctx = canvasRef.current.getContext('2d');
@@ -187,7 +204,7 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         if (tempCanvas.width > 0) {
-          ctx.drawImage(tempCanvas, 0, 0, width, height);
+          ctx.drawImage(tempCanvas, 0, 0, sizeValue, sizeValue);
         }
       }
 
@@ -517,10 +534,73 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
     }, 1500);
   };
 
+  const handleDownloadSelf = () => {
+    const rawCanvas = canvasRef.current;
+    if (rawCanvas) {
+      const link = document.createElement('a');
+      link.download = `mandala-${Date.now()}.png`;
+      const dataUrl = rawCanvas.toDataURL();
+      link.href = dataUrl;
+      link.click();
+
+      if (onSaveToGallery) {
+        const exportName = `导出的曼陀罗 #${Date.now().toString().slice(-4)}`;
+        onSaveToGallery(exportName, dataUrl);
+      }
+    }
+  };
+
   return (
-    <div ref={containerRef} className="relative w-full h-full flex items-center justify-center p-12 overflow-hidden cursor-crosshair">
+    <div ref={containerRef} className="relative w-full h-full flex flex-col items-center justify-center p-2 xs:p-4 md:p-6 overflow-hidden select-none">
       
-      <div className="relative aspect-square h-full max-h-full rounded-full bg-[#FCFAF6] border border-amber-200/30 shadow-md overflow-hidden touch-none">
+      {/* 1. TOP HEADER SECTION: Undo, Redo, and Clear Layout Area */}
+      <div className="flex items-center gap-1.5 sm:gap-3 mb-2 sm:mb-4 z-20 w-full justify-center">
+        <button
+          onClick={undo}
+          disabled={!canUndoSelf}
+          type="button"
+          className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${
+            canUndoSelf 
+              ? 'bg-stone-850 text-stone-100 border-stone-700 hover:bg-stone-750 cursor-pointer active:scale-95 shadow-sm' 
+              : 'opacity-30 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+          }`}
+          title="撤销"
+        >
+          <Undo2 size={12} />
+          <span>撤销</span>
+        </button>
+
+        <button
+          onClick={redo}
+          disabled={!canRedoSelf}
+          type="button"
+          className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${
+            canRedoSelf 
+              ? 'bg-stone-850 text-stone-100 border-stone-700 hover:bg-stone-750 cursor-pointer active:scale-95 shadow-sm' 
+              : 'opacity-30 bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+          }`}
+          title="重做"
+        >
+          <Redo2 size={12} />
+          <span>重做</span>
+        </button>
+
+        <button
+          onClick={restart}
+          type="button"
+          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full transition-all text-xs font-semibold border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 cursor-pointer active:scale-95 shadow-sm"
+          title="清空画板"
+        >
+          <RefreshCw size={11} className="animate-spin-once" />
+          <span>清空</span>
+        </button>
+      </div>
+
+      {/* 2. MIDDLE VIEWPORT SECTION: Guaranteed Perfect Circular Artboard */}
+      <div 
+        style={{ width: `${canvasSize}px`, height: `${canvasSize}px` }}
+        className="relative rounded-full bg-[#FCFAF6] border border-amber-200/30 shadow-md overflow-hidden touch-none cursor-crosshair shrink-0 transition-all duration-300"
+      >
         {/* Hidden Master Drawing Storage Canvas */}
         <canvas id="mandala-master-canvas" ref={canvasRef} className="hidden" />
 
@@ -540,9 +620,29 @@ const MandalaCanvas: React.FC<MandalaCanvasProps> = ({
           onTouchStart={handleStart}
           onTouchMove={handleMove}
           onTouchEnd={handleEnd}
-          className="absolute inset-0 block"
+          className="absolute inset-0 block cursor-crosshair"
           style={{ width: '100%', height: '100%' }}
         />
+      </div>
+
+      {/* 3. BOTTOM ACTIONS SECTION: Save and Export Layout Area */}
+      <div className="flex items-center gap-2 sm:gap-4 mt-3 sm:mt-5 z-20 w-full justify-center">
+        <button
+          onClick={triggerSaveToGalleryFlow}
+          type="button"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 border border-amber-500 text-white rounded-full transition-all font-bold text-xs shadow-md active:scale-95 cursor-pointer"
+        >
+          <FolderHeart size={13} />
+          <span>保存画作</span>
+        </button>
+        <button
+          onClick={handleDownloadSelf}
+          type="button"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-full transition-all font-bold text-xs border bg-white hover:bg-stone-50 border-stone-200 text-stone-700 shadow-sm active:scale-95 cursor-pointer"
+        >
+          <Download size={13} />
+          <span>导出图片</span>
+        </button>
       </div>
 
       {/* Save Name Modal Dialog */}

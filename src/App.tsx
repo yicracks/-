@@ -30,6 +30,9 @@ import SleepPlayer from './components/SleepPlayer';
 import SoundMixer from './components/SoundMixer';
 import MyCreations from './components/MyCreations';
 import { MandalaSettings, SavedMandala, SavedTrack } from './types';
+import { registerBgmSounds } from './utils/noiseCatalog';
+import { updateAvailableAsmrSounds } from './utils/audioSynth';
+import { Lang, t } from './utils/i18n';
 
 export const MandalaLogo: React.FC<{ size?: number; className?: string }> = ({ size = 24, className = "" }) => {
   return (
@@ -77,6 +80,54 @@ export const MandalaLogo: React.FC<{ size?: number; className?: string }> = ({ s
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'player' | 'canvas' | 'mixer' | 'creations'>('player');
+  const [lang, setLang] = useState<Lang>(() => {
+    return window.location.pathname.startsWith('/zh') ? 'zh' : 'en';
+  });
+
+  // Keep path sync on popstate
+  React.useEffect(() => {
+    const handlePop = () => {
+      setLang(window.location.pathname.startsWith('/zh') ? 'zh' : 'en');
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, []);
+
+  // Update real-time document title safely matching selected mode
+  React.useEffect(() => {
+    document.title = lang === 'zh'
+      ? '曼陀罗催眠 - 专属智能与舒缓音境空间'
+      : 'Zen Mandala - Custom Healing Soundscapes';
+  }, [lang]);
+
+  const handleLanguageChange = (newLang: Lang) => {
+    setLang(newLang);
+    if (newLang === 'zh') {
+      window.history.pushState(null, '', '/zh');
+    } else {
+      window.history.pushState(null, '', '/');
+    }
+  };
+
+  // Load and register dynamic BGM folders on initial startup
+  React.useEffect(() => {
+    fetch('/api/bgm-list')
+      .then(res => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then((data: Array<{ filename: string; name: string; url: string }>) => {
+        if (Array.isArray(data) && data.length > 0) {
+          registerBgmSounds(data);
+          updateAvailableAsmrSounds();
+          console.log("Registered dynamic BGM list successfully:", data);
+        }
+      })
+      .catch(err => {
+        console.warn("BGM server endpoints not available (offline/preview client-only mode):", err);
+      });
+  }, []);
+
   const [themeMode, setThemeMode] = useState<'day' | 'night' | 'eye' | 'custom'>('day');
   const [customBgColor, setCustomBgColor] = useState<string>('#9AB8A2'); // elegant sage green / pastel custom initial
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -242,23 +293,26 @@ export default function App() {
         />
       </div>
 
-      {/* Modern High-Aesthetics Pristine Navigation Bar */}
-      <header className={`relative w-full z-40 backdrop-blur-md px-6 lg:px-12 py-4 flex flex-col md:flex-row items-center justify-between gap-4 transition-all duration-300 border-b ${
+      {/* Modern High-Aesthetics Pristine Navigation Bar - Enhanced Compact Responsive */}
+      <header className={`relative w-full z-40 backdrop-blur-md px-4 md:px-6 lg:px-12 py-3 md:py-4 flex flex-row items-center justify-between gap-2.5 transition-all duration-300 border-b ${
         isDark 
           ? 'bg-stone-900/80 border-stone-805 text-stone-100' 
           : 'bg-white/70 border-stone-200/60 text-stone-800'
       }`}>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-600 shadow-sm shadow-amber-500/5">
-            <MandalaLogo size={24} className="text-amber-600" />
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-600 shadow-sm shadow-amber-500/5">
+            <MandalaLogo size={20} className="text-amber-600" />
           </div>
           <div>
-            <h1 className={`text-base font-extrabold tracking-tight leading-tight transition-colors ${isDark ? 'text-stone-100' : 'text-stone-800'}`}>曼陀罗催眠</h1>
+            <h1 className={`text-xs md:text-base font-extrabold tracking-tight leading-tight transition-colors ${isDark ? 'text-stone-100' : 'text-stone-800'}`}>
+              {t(lang, 'app.title')}
+            </h1>
+            <p className="hidden md:block text-[8px] font-bold tracking-wider opacity-40 uppercase">{t(lang, 'app.subtitle')}</p>
           </div>
         </div>
 
-        {/* Tab Selection Row - Renamed strictly according to request - unified text size */}
-        <nav className={`flex p-1 border rounded-2xl gap-1 shadow-sm transition-colors ${
+        {/* Tab Selection Row - Hidden on mobile screen, loaded inside Bottom Bar */}
+        <nav className={`hidden md:flex p-1 border rounded-2xl gap-1 shadow-sm transition-colors ${
           isDark 
             ? 'bg-stone-950/80 border-stone-800' 
             : 'bg-stone-100/80 border-stone-250/20'
@@ -276,7 +330,7 @@ export default function App() {
             }`}
           >
             <Moon size={14} className={activeTab === 'player' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
-            <span>催眠播放器</span>
+            <span>{t(lang, 'tab.player')}</span>
           </button>
 
           <button
@@ -292,7 +346,7 @@ export default function App() {
             }`}
           >
             <Grid2X2 size={14} className={activeTab === 'canvas' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
-            <span>曼陀罗画制作</span>
+            <span>{t(lang, 'tab.canvas')}</span>
           </button>
 
           <button
@@ -308,7 +362,7 @@ export default function App() {
             }`}
           >
             <Volume2 size={14} className={activeTab === 'mixer' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
-            <span>催眠混音制作</span>
+            <span>{t(lang, 'tab.mixer')}</span>
           </button>
 
           <button
@@ -324,27 +378,53 @@ export default function App() {
             }`}
           >
             <Sparkles size={14} className={activeTab === 'creations' ? 'text-amber-600' : isDark ? 'text-stone-500' : 'text-stone-400'} />
-            <span>我的作品</span>
+            <span>{t(lang, 'tab.creations')}</span>
           </button>
         </nav>
 
-        {/* Dynamic theme adaptive switcher control Settings Gear button */}
-        <div className="flex items-center">
+        {/* Dynamic theme adaptive switcher control Settings Gear button + Language Selector */}
+        <div className="flex items-center gap-2">
+          {/* Language toggle selector pill */}
+          <div className={`flex items-center rounded-xl p-0.5 border text-[10px] font-bold ${
+            isDark ? 'bg-stone-950/60 border-stone-800' : 'bg-stone-100 border-stone-200'
+          }`}>
+            <button
+              onClick={() => handleLanguageChange('en')}
+              className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                lang === 'en'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-stone-400 hover:text-stone-605'
+              }`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => handleLanguageChange('zh')}
+              className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                lang === 'zh'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-stone-400 hover:text-stone-605'
+              }`}
+            >
+              中文
+            </button>
+          </div>
+
           <button
             onClick={() => {
               setSettingsSubTab('appearance');
               setShowSettingsModal(true);
             }}
-            title="高级设置"
+            title={lang === 'zh' ? '高级设置' : 'Advanced settings'}
             type="button"
-            className={`px-4 py-2 rounded-2xl border flex items-center justify-center gap-1.5 transition-all text-xs font-semibold shadow-sm active:scale-95 hover:border-amber-500 ${
+            className={`px-3 py-1.5 rounded-xl md:rounded-2xl border flex items-center justify-center gap-1.5 transition-all text-xs font-semibold shadow-sm active:scale-95 hover:border-amber-500 ${
               isDark 
                 ? 'bg-stone-900 border-stone-805 text-stone-300 hover:text-amber-400 hover:bg-stone-850' 
                 : 'bg-stone-50 border-stone-250/50 text-stone-650 hover:text-amber-700 hover:bg-stone-100'
             }`}
           >
-            <Settings size={14} className="animate-spin-slow text-amber-600" />
-            <span>设置</span>
+            <Settings size={13} className="animate-spin-slow text-amber-600" />
+            <span className="hidden sm:inline">{t(lang, 'btn.settings')}</span>
           </button>
         </div>
       </header>
@@ -356,7 +436,7 @@ export default function App() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className={`flex-1 relative rounded-[32px] border backdrop-blur-lg shadow-md p-6 transition-all duration-300 m-6 h-[calc(100vh-130px)] ${
+          className={`flex-1 relative rounded-2xl md:rounded-[32px] border backdrop-blur-lg shadow-md p-3 md:p-6 transition-all duration-300 m-2 md:m-6 h-[calc(100vh-140px)] md:h-[calc(100vh-130px)] pb-16 md:pb-6 ${
             isDark 
               ? 'border-stone-850/80 bg-stone-900/35 text-stone-100 shadow-stone-950/20' 
               : 'border-stone-200/50 bg-white/40 text-stone-800 shadow-stone-200/10'
@@ -386,6 +466,7 @@ export default function App() {
               isDark={isDark}
               fadeEnabled={fadeEnabled}
               settings={settings}
+              lang={lang}
             />
           </motion.div>
 
@@ -412,6 +493,7 @@ export default function App() {
               canUndo={canUndo}
               canRedo={canRedo}
               isDark={isDark}
+              lang={lang}
             />
 
             {/* Canvas area container */}
@@ -432,7 +514,7 @@ export default function App() {
               />
 
               {/* Floating control toolbar nested inside the canvas container */}
-              <FloatingToolbar settings={settings} setSettings={setSettings} isDark={isDark} />
+              <FloatingToolbar settings={settings} setSettings={setSettings} isDark={isDark} lang={lang} />
             </div>
           </motion.div>
 
@@ -452,6 +534,7 @@ export default function App() {
               onAddTrack={handleAddTrack}
               onNavigateToTab={setActiveTab}
               isDark={isDark}
+              lang={lang}
             />
           </motion.div>
 
@@ -479,6 +562,7 @@ export default function App() {
               setActiveTrackId={setActiveTrackId}
               isDark={isDark}
               onNavigateToTab={setActiveTab}
+              lang={lang}
             />
           </motion.div>
         </motion.main>
@@ -516,7 +600,9 @@ export default function App() {
               }`}>
                 <div className="flex items-center gap-2">
                   <Settings size={15} className="text-amber-600 animate-spin-slow" />
-                  <span className="text-xs font-bold tracking-tight">高级设置 & 关于</span>
+                  <span className="text-xs font-bold tracking-tight">
+                    {lang === 'zh' ? '高级设置 & 关于' : 'Settings & Information'}
+                  </span>
                 </div>
                 <button
                   onClick={() => setShowSettingsModal(false)}
@@ -545,7 +631,7 @@ export default function App() {
                   }`}
                 >
                   <Palette size={13} className="text-amber-600" />
-                  <span>外观 (Appearance)</span>
+                  <span>{lang === 'zh' ? '外观 (Appearance)' : 'Appearance'}</span>
                 </button>
 
                 <button
@@ -561,7 +647,7 @@ export default function App() {
                   }`}
                 >
                   <Info size={13} className="text-amber-600" />
-                  <span>关于 (About)</span>
+                  <span>{lang === 'zh' ? '关于 (About)' : 'About'}</span>
                 </button>
               </div>
 
@@ -876,6 +962,49 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Mobile Bottom Navigation Bar - Floating, thumb-friendly iOS style */}
+      <div className="md:hidden fixed bottom-3 left-4 right-4 z-40 bg-stone-900/90 backdrop-blur-lg border border-stone-800/80 rounded-2xl py-2 px-3 flex justify-around shadow-lg shadow-black/40">
+        <button
+          onClick={() => setActiveTab('player')}
+          className={`flex flex-col items-center justify-center gap-1 transition-all w-16 ${
+            activeTab === 'player' ? 'text-amber-500 font-bold scale-105' : 'text-stone-400'
+          }`}
+        >
+          <Moon size={18} />
+          <span className="text-[10px]">{t(lang, 'tab.player')}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('canvas')}
+          className={`flex flex-col items-center justify-center gap-1 transition-all w-16 ${
+            activeTab === 'canvas' ? 'text-amber-500 font-bold scale-105' : 'text-stone-400'
+          }`}
+        >
+          <Grid2X2 size={18} />
+          <span className="text-[10px]">{t(lang, 'tab.canvas')}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('mixer')}
+          className={`flex flex-col items-center justify-center gap-1 transition-all w-16 ${
+            activeTab === 'mixer' ? 'text-amber-500 font-bold scale-105' : 'text-stone-400'
+          }`}
+        >
+          <Volume2 size={18} />
+          <span className="text-[10px]">{t(lang, 'tab.mixer')}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('creations')}
+          className={`flex flex-col items-center justify-center gap-1 transition-all w-16 ${
+            activeTab === 'creations' ? 'text-amber-500 font-bold scale-105' : 'text-stone-400'
+          }`}
+        >
+          <Sparkles size={18} />
+          <span className="text-[10px]">{t(lang, 'tab.creations')}</span>
+        </button>
+      </div>
       
     </div>
   );

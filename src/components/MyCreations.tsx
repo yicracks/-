@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { SavedMandala, SavedTrack } from '../types';
 import { renderMixerTracksToWav, savedTrackToMixerTracks } from '../utils/audioRender';
+import { Lang } from '../utils/i18n';
 
 interface MyCreationsProps {
   savedMandalas: SavedMandala[];
@@ -29,6 +30,7 @@ interface MyCreationsProps {
   setActiveTrackId: (id: string) => void;
   isDark: boolean;
   onNavigateToTab: (tab: 'player' | 'canvas' | 'mixer' | 'creations') => void;
+  lang?: Lang;
 }
 
 export default function MyCreations({
@@ -43,7 +45,8 @@ export default function MyCreations({
   activeTrackId,
   setActiveTrackId,
   isDark,
-  onNavigateToTab
+  onNavigateToTab,
+  lang = 'en'
 }: MyCreationsProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState<string>('');
@@ -57,7 +60,9 @@ export default function MyCreations({
       {/* Decorative Top header */}
       <div className="flex items-center justify-between border-b pb-4 border-stone-200/10">
         <div>
-          <h2 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-stone-850'}`}>我的专属作品集</h2>
+          <h2 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-stone-850'}`}>
+            {lang === 'zh' ? '我的专属作品集' : 'My Dreamscapes Collection'}
+          </h2>
         </div>
       </div>
 
@@ -72,7 +77,7 @@ export default function MyCreations({
                 <ImageIcon size={12} />
               </div>
               <h3 className={`text-sm font-bold ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>
-                制作的曼陀罗图案 ({savedMandalas.length})
+                {lang === 'zh' ? '制作的曼陀罗图案' : 'Handdrawn Mandalas'} ({savedMandalas.length})
               </h3>
             </div>
             
@@ -85,7 +90,7 @@ export default function MyCreations({
               }`}
             >
               <Plus size={10} />
-              <span>绘制新画布</span>
+              <span>{lang === 'zh' ? '绘制新画布' : 'Draw New Canvas'}</span>
             </button>
           </div>
 
@@ -103,14 +108,16 @@ export default function MyCreations({
                   <Compass size={18} className="text-stone-400" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-bold">暂无制作的曼陀罗</p>
-                  <p className="text-xs opacity-75">利用对称物理镜像画板，开始描摹专属的心灵密码吧</p>
+                  <p className="text-xs font-bold">{lang === 'zh' ? '暂无制作的曼陀罗' : 'No Saved Mandalas'}</p>
+                  <p className="text-xs opacity-75">
+                    {lang === 'zh' ? '利用对称物理镜像画板，开始描摹专属的心灵密码吧' : 'Outline symmetric focal mandalas to calibrate your mind.'}
+                  </p>
                 </div>
                 <button
                   onClick={() => onNavigateToTab('canvas')}
                   className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold active:scale-95 shadow-sm transition-all"
                 >
-                  去制作曼陀罗🎨
+                  {lang === 'zh' ? '去制作曼陀罗🎨' : 'Open Sketchboard🎨'}
                 </button>
               </motion.div>
             ) : (
@@ -198,7 +205,7 @@ export default function MyCreations({
                                 setEditingId(mandala.id);
                                 setEditingValue(mandala.name);
                               }}
-                              title="点击重命名"
+                              title={lang === 'zh' ? '点击重命名' : 'Click to rename'}
                               className={`text-xs font-bold truncate cursor-pointer hover:text-amber-500 transition-colors ${
                                 isDark ? 'text-stone-200' : 'text-stone-800'
                               }`}
@@ -206,7 +213,7 @@ export default function MyCreations({
                               {mandala.name} ✏️
                             </p>
                           )}
-                          <p className={`text-[10px] font-mono mt-0.5 ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
+                          <p className={`text-[10px] font-mono mt-0.5 ${isDark ? 'text-stone-550' : 'text-stone-400'}`}>
                             ID: {mandala.id.split('-').pop()?.toUpperCase() || mandala.id.slice(-4)}
                           </p>
                         </div>
@@ -215,50 +222,54 @@ export default function MyCreations({
                         <div className="grid grid-cols-3 gap-1">
                           <button
                             type="button"
-                            title={isActive ? '当前正在作为播放器梦境背景进行动态展示' : '点击将此曼陀罗设为播放器梦境背景'}
+                            title={
+                              isActive
+                                ? (lang === 'zh' ? '当前正在作为播放器梦境背景进行动态展示' : 'Active sleep focus ambiance background')
+                                : (lang === 'zh' ? '点击将此曼陀罗设为播放器梦境背景' : 'Set as sleep ambiance focus background')
+                            }
                             onClick={() => setSelectedMandalaId(mandala.id)}
-                            className={`py-1 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center ${
+                            className={`py-1 rounded-lg text-[10px] font-bold transition-all text-center flex items-center justify-center ${
                               isActive
                                 ? 'bg-amber-600 text-white shadow-sm font-bold'
                                 : isDark
-                                  ? 'bg-stone-800 text-stone-300 hover:text-stone-100 hover:bg-stone-750'
+                                  ? 'bg-stone-80/20 text-stone-300 hover:text-stone-100'
                                   : 'bg-stone-50 text-stone-650 hover:bg-stone-100 hover:text-stone-900 border border-stone-200'
                             }`}
                           >
-                            <span>{isActive ? '使用中' : '使用'}</span>
+                            <span>{isActive ? (lang === 'zh' ? '使用中' : 'Active') : (lang === 'zh' ? '使用' : 'Apply')}</span>
                           </button>
 
                           <button
                             type="button"
-                            title="下载此曼陀罗图片"
+                            title={lang === 'zh' ? '下载此曼陀罗图片' : 'Download image (PNG)'}
                             onClick={() => {
                               const link = document.createElement('a');
                               link.download = `${mandala.name.replace(/\s+/g, '_')}.png`;
                               link.href = mandala.dataUrl;
                               link.click();
                             }}
-                            className={`py-1 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center border ${
+                            className={`py-1 rounded-lg text-[10px] font-bold transition-all text-center flex items-center justify-center border ${
                               isDark
                                 ? 'bg-stone-800 border-stone-700 text-stone-300 hover:text-white hover:bg-stone-750'
                                 : 'bg-stone-50 border-stone-200 text-stone-650 hover:bg-stone-100 hover:text-stone-900'
                             }`}
                           >
-                            <Download size={10} className="mr-0.5" />
-                            <span>下载</span>
+                            <Download size={10} className="mr-0.5 shrink-0" />
+                            <span>{lang === 'zh' ? '下载' : 'Save'}</span>
                           </button>
                           
                           <button
                             type="button"
-                            title="删除作品"
+                            title={lang === 'zh' ? '删除作品' : 'Delete'}
                             onClick={() => onDeleteMandala(mandala.id)}
-                            className={`py-1 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center border border-transparent ${
+                            className={`py-1 rounded-lg text-[10px] font-bold transition-all text-center flex items-center justify-center border border-transparent ${
                               isDark
                                 ? 'bg-stone-950 hover:bg-red-950/20 hover:border-red-900/50 text-stone-500 hover:text-red-400'
                                 : 'bg-stone-50/50 hover:bg-red-50 hover:border-red-200 text-stone-450 hover:text-red-600 border-stone-200'
                             }`}
                           >
-                            <Trash2 size={10} className="mr-0.5" />
-                            <span>删除</span>
+                            <Trash2 size={10} className="mr-0.5 shrink-0" />
+                            <span>{lang === 'zh' ? '删除' : 'Delete'}</span>
                           </button>
                         </div>
                       </div>
@@ -271,14 +282,14 @@ export default function MyCreations({
         </div>
 
         {/* Section 2: 制作的催眠混音 */}
-        <div id="audio-creations-section" className="space-y-4">
+        <div id="audio-creations-section" className="space-y-4 font-sans">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/20">
                 <Music size={12} />
               </div>
               <h3 className={`text-sm font-bold ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>
-                制作的催眠混音 ({savedTracks.length})
+                {lang === 'zh' ? '制作的催眠混音' : 'Custom Soundtracks'} ({savedTracks.length})
               </h3>
             </div>
             
@@ -291,7 +302,7 @@ export default function MyCreations({
               }`}
             >
               <Plus size={10} />
-              <span>调配新共鸣</span>
+              <span>{lang === 'zh' ? '调配新共鸣' : 'Mix New Ambiance'}</span>
             </button>
           </div>
 
@@ -309,14 +320,16 @@ export default function MyCreations({
                   <Music size={18} className="text-stone-400" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-bold">暂无制作的催眠混音</p>
-                  <p className="text-xs opacity-75">利用声音多轨叠加台，合成只给自己的睡眠共鸣助眠曲</p>
+                  <p className="text-xs font-bold">{lang === 'zh' ? '暂无制作的催眠混音' : 'No Custom Soundtracks'}</p>
+                  <p className="text-xs opacity-75">
+                    {lang === 'zh' ? '利用混音合成，制作专属的催眠助眠曲' : 'Combine multiple natural nodes to synthesize custom bedtime ambiance.'}
+                  </p>
                 </div>
                 <button
                   onClick={() => onNavigateToTab('mixer')}
                   className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold active:scale-95 shadow-sm transition-all border border-emerald-500"
                 >
-                  去调配混音🎵
+                  {lang === 'zh' ? '去调配混音🎵' : 'Mix Ambiance🎵'}
                 </button>
               </motion.div>
             ) : (
@@ -332,7 +345,17 @@ export default function MyCreations({
                   if (track.mixerTracks && track.mixerTracks.length > 0) {
                     subLabel = track.mixerTracks
                       .filter(t => t.active)
-                      .map(t => t.name)
+                      .map(t => {
+                        const originalName = t.name;
+                        if (lang === 'zh') return originalName;
+                        if (originalName === '天音颂钵') return 'Singing Bowl';
+                        if (originalName === '深夜林间微雨') return 'Forest Rain';
+                        if (originalName === '远山闷雷') return 'Distant Thunder';
+                        if (originalName === '潮汐起落') return 'Tidal Waves';
+                        if (originalName === '旷野微风') return 'Valley Wind';
+                        if (originalName === '红泥暖炉炭火') return 'Campfire Crackle';
+                        return originalName;
+                      })
                       .slice(0, 4)
                       .join(' + ');
                   } else if (track.sounds) {
@@ -340,18 +363,18 @@ export default function MyCreations({
                     subLabel = Object.entries(track.sounds)
                       .filter(([_, vol]) => (vol as number) > 0)
                       .map(([id]) => {
-                        if (id === 'bowl') return '天音颂钵';
-                        if (id === 'rain') return '深夜林间微雨';
-                        if (id === 'thunder') return '远山闷雷';
-                        if (id === 'ocean') return '潮汐起落';
-                        if (id === 'wind') return '旷野微风';
-                        if (id === 'crackle') return '红泥暖炉炭火';
+                        if (id === 'bowl') return lang === 'zh' ? '天音颂钵' : 'Singing Bowl';
+                        if (id === 'rain') return lang === 'zh' ? '深夜林间微雨' : 'Forest Rain';
+                        if (id === 'thunder') return lang === 'zh' ? '远山闷雷' : 'Distant Thunder';
+                        if (id === 'ocean') return lang === 'zh' ? '潮汐起落' : 'Tidal Waves';
+                        if (id === 'wind') return lang === 'zh' ? '旷野微风' : 'Valley Wind';
+                        if (id === 'crackle') return lang === 'zh' ? '红泥暖炉炭火' : 'Campfire Crackle';
                         return id;
                       })
                       .join(' + ');
                   }
                   
-                  if (!subLabel) subLabel = '纯净底噪氛围色';
+                  if (!subLabel) subLabel = lang === 'zh' ? '纯净底噪氛围色' : 'Pure Background Nodes';
 
                   return (
                     <motion.div
@@ -422,7 +445,7 @@ export default function MyCreations({
                                   setEditingId(track.id);
                                   setEditingValue(track.name);
                                 }}
-                                title="点击重命名"
+                                title={lang === 'zh' ? '点击重命名' : 'Click to rename'}
                                 className={`text-sm font-semibold truncate cursor-pointer hover:text-amber-500 transition-colors ${
                                   isDark ? 'text-stone-100' : 'text-stone-800'
                                 }`}
@@ -432,7 +455,7 @@ export default function MyCreations({
                             )}
                             {isActive && (
                               <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-md text-[10px] font-black tracking-widest scale-95 origin-left">
-                                使用中
+                                {lang === 'zh' ? '使用中' : 'Active'}
                               </span>
                             )}
                           </div>
@@ -448,7 +471,7 @@ export default function MyCreations({
                         <button
                           type="button"
                           onClick={() => setActiveTrackId(track.id)}
-                          title={isActive ? '当前正在伴眠中' : '将此白噪音伴眠曲设为当前播放曲轨'}
+                          title={isActive ? (lang === 'zh' ? '当前正在伴眠中' : 'Active soundtrack') : (lang === 'zh' ? '将此白噪音伴眠曲设为当前播放曲轨' : 'Load track in active sleep section')}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
                             isActive
                               ? 'bg-emerald-600 text-white shadow-sm'
@@ -458,39 +481,39 @@ export default function MyCreations({
                           }`}
                         >
                           <Play size={8} fill={isActive ? '#ffffff' : 'currentColor'} />
-                          <span>{isActive ? '正在伴眠' : '使用'}</span>
+                          <span>{isActive ? (lang === 'zh' ? '正在伴眠' : 'Playing') : (lang === 'zh' ? '使用' : 'Apply')}</span>
                         </button>
 
                         <button
                           type="button"
-                          title={isDownloading ? "正在合成中..." : "合成并下载高保真 WAV 音频文件"}
+                          title={isDownloading ? (lang === 'zh' ? "正在合成中..." : "Rendering hi-fi wav...") : (lang === 'zh' ? "合成并下载高保真 WAV 音频文件" : "Render and download high-resolution stereo WAV file")}
                           disabled={isDownloading}
                           onClick={async () => {
                             const rawTracks = savedTrackToMixerTracks(track);
                             const activeTracks = rawTracks.filter(t => t.active);
                             if (activeTracks.length === 0) {
-                              alert("无法合成此伴眠曲，因为没有包含任何活跃的白噪音或底噪轨。");
+                              alert(lang === 'zh' ? "无法合成此伴眠曲，因为没有包含任何活跃的白噪音或底噪轨。" : "Cannot composite ambiance because there are no active noise streams.");
                               return;
                             }
 
                             const renderableActive = activeTracks.filter(t => t.type !== 'tts');
                             if (renderableActive.length === 0) {
-                              alert("由于安全和技术架构限制，单纯由TTS朗读语音构成的混合轨无法直接转换为离线音频文件。推荐将TTS与白噪音底噪、导入或麦克风音轨协同混合后重试。");
+                              alert(lang === 'zh' ? "由于安全和技术架构限制，单纯由TTS朗读语音构成的混合轨无法直接转换为离线音频文件。推荐将TTS与白噪音底噪、导入或麦克风音轨协同混合后重试。" : "Single TTS tracks cannot be synthesized directly due to host sandbox API limits. Blend with a backdrop noise and search nodes first.");
                               return;
                             }
 
                             setIsDownloading(true);
                             setDownloadingTrackId(track.id);
-                            setDownloadProgress('正在初始化混合渲染缓冲区...');
+                            setDownloadProgress(lang === 'zh' ? '正在初始化混合渲染缓冲区...' : 'Initializing layout audio render buffer...');
 
                             try {
                               const hasTts = activeTracks.some(t => t.type === 'tts');
                               const renderDuration = 60; // 60s sample loop
 
-                              setDownloadProgress('正在数字虚拟混片并生成高解析原声 (60秒)...');
+                              setDownloadProgress(lang === 'zh' ? '正在数字虚拟混片并生成高解析原声 (60秒)...' : 'Compiling active ambient loops (60s stereo wave)...');
                               const audioBlob = await renderMixerTracksToWav(rawTracks, renderDuration);
 
-                              setDownloadProgress('合并写入 WAV 格式...');
+                              setDownloadProgress(lang === 'zh' ? '合并写入 WAV 格式...' : 'Encoding output chunk stream to WAV format...');
                               const url = URL.createObjectURL(audioBlob);
                               const link = document.createElement('a');
                               link.href = url;
@@ -499,11 +522,13 @@ export default function MyCreations({
                               URL.revokeObjectURL(url);
 
                               if (hasTts) {
-                                alert("下载成功！\n注意：受安全沙箱约束，离线混音器暂时无法在渲染侧合成TTS朗读轨道（TTS轨道在伴眠端可协同在线播发）。所有底噪白噪音、录制音轨和外部乐曲已经全部成功混缩！");
+                                alert(lang === 'zh' 
+                                  ? "下载成功！\n注意：受安全沙箱约束，离线混音器暂时无法在渲染侧合成TTS朗读轨道（TTS轨道在伴眠端可协同在线播发）。所有底噪白噪音、录制音轨和外部乐曲已经全部成功混缩！"
+                                  : "Export successful!\nNotice: Offline mixer rendered all natural ambient noise layers. The dynamic voice TTS is compiled dynamically inside the live player on runtime.");
                               }
                             } catch (err: any) {
                               console.error("Mixed render error:", err);
-                              alert(`合成合并失败: ${err?.message || '请移除过大文件后重试'}`);
+                              alert(`${lang === 'zh' ? '合成合并失败:' : 'Synthesis failed:'} ${err?.message || 'Please remove heavy voice clips and retry'}`);
                             } finally {
                               setIsDownloading(false);
                               setDownloadingTrackId(null);
@@ -528,7 +553,7 @@ export default function MyCreations({
                         <button
                           type="button"
                           onClick={() => onDeleteTrack(track.id)}
-                          title="删除作品"
+                          title={lang === 'zh' ? "删除作品" : "Delete Track"}
                           className={`p-1.5 rounded-xl transition-all border border-transparent ${
                             isDark
                               ? 'bg-stone-950 text-stone-550 hover:text-red-400 hover:bg-red-950/20 hover:border-red-900/40'
@@ -566,7 +591,7 @@ export default function MyCreations({
               <div className="flex flex-col items-center justify-center space-y-4">
                 <div className="w-12 h-12 rounded-full border-4 border-amber-600/20 border-t-amber-600 animate-spin" />
                 <div className="space-y-1.5">
-                  <h4 className="text-sm font-bold">高品质音频合成中</h4>
+                  <h4 className="text-sm font-bold">{lang === 'zh' ? '高品质音频合成中' : 'Synthesizing HD Soundscape'}</h4>
                   <p className="text-xs opacity-75">{downloadProgress}</p>
                 </div>
               </div>

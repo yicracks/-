@@ -2,13 +2,26 @@
 // This avoids relying on external host files, offering customizable parameters.
 import { NOISE_CATALOG, getSoundById } from './noiseCatalog';
 
-export const AVAILABLE_ASMR_SOUNDS = NOISE_CATALOG.flatMap(cat => 
+export const AVAILABLE_ASMR_SOUNDS: Array<{ id: string; name: string; desc: string }> = NOISE_CATALOG.flatMap(cat => 
   cat.sounds.map(s => ({
     id: s.id,
     name: `${s.name}`,
     desc: `物理音轨 - 归类于 ${cat.name}`
   }))
 );
+
+export function updateAvailableAsmrSounds() {
+  AVAILABLE_ASMR_SOUNDS.length = 0;
+  NOISE_CATALOG.forEach(cat => {
+    cat.sounds.forEach(s => {
+      AVAILABLE_ASMR_SOUNDS.push({
+        id: s.id,
+        name: `${s.name}`,
+        desc: `物理音轨 - 归类于 ${cat.name}`
+      });
+    });
+  });
+}
 
 // HTML5 standard Audio elements cache for looping physical white noise files
 const physicalAudioCache: { [soundId: string]: HTMLAudioElement } = {};
@@ -102,8 +115,10 @@ export function setSoundVolume(soundId: string, volume: number) {
       return;
     }
 
-    // 1. Try playing from physical audio files first
+    // 1. Try playing from physical audio files first (the real high-quality recordings)
     const physicalSound = getSoundById(soundId);
+    let hasPlayedPhysical = false;
+
     if (physicalSound) {
       let audio = physicalAudioCache[soundId];
       if (!audio) {
@@ -113,24 +128,51 @@ export function setSoundVolume(soundId: string, volume: number) {
       }
       audio.volume = Math.min(1.0, Math.max(0, volume));
       if (audio.paused) {
-        audio.play().catch(err => {
-          console.warn(`Physical sound play delayed/prevented: ${physicalSound.url}`, err);
-        });
+        audio.play()
+          .then(() => {
+            // Successfully started physical playback! Stop any procedural fallback to prevent double-play.
+            const synthId = getProceduralSynthId(soundId);
+            if (synthId && activeNodes[synthId]) {
+              const nodeInfo = activeNodes[synthId];
+              if (nodeInfo.updater) nodeInfo.updater();
+              try {
+                nodeInfo.gainNode.disconnect();
+              } catch (e) {}
+              delete activeNodes[synthId];
+            }
+          })
+          .catch(err => {
+            console.warn(`Physical sound play delayed/prevented: ${physicalSound.url}`, err);
+          });
       }
+      hasPlayedPhysical = true;
     }
 
-    // 2. Play Web Audio procedural synthesis as our premium 100% reliable sound producer
-    const synthId = getProceduralSynthId(soundId);
-    if (synthId) {
-      const ctx = getAudioContext();
-      if (!activeNodes[synthId]) {
-        startSound(ctx, synthId);
-      }
+    // 2. Play Web Audio procedural synthesis ONLY if we did not have a physical sound!
+    if (!hasPlayedPhysical) {
+      const synthId = getProceduralSynthId(soundId);
+      if (synthId) {
+        const ctx = getAudioContext();
+        if (!activeNodes[synthId]) {
+          startSound(ctx, synthId);
+        }
 
-      const nodeInfo = activeNodes[synthId];
-      if (nodeInfo) {
-        // Smooth transit to avoid audio pops
-        nodeInfo.gainNode.gain.setTargetAtTime(volume * (synthId.startsWith('bgm-') ? 0.6 : 0.3), ctx.currentTime, 0.1);
+        const nodeInfo = activeNodes[synthId];
+        if (nodeInfo) {
+          // Smooth transit to avoid audio pops
+          nodeInfo.gainNode.gain.setTargetAtTime(volume * (synthId.startsWith('bgm-') ? 0.6 : 0.3), ctx.currentTime, 0.1);
+        }
+      }
+    } else {
+      // If we are playing physical sound, ensure any procedural node for this sound is stopped
+      const synthId = getProceduralSynthId(soundId);
+      if (synthId && activeNodes[synthId]) {
+        const nodeInfo = activeNodes[synthId];
+        if (nodeInfo.updater) nodeInfo.updater();
+        try {
+          nodeInfo.gainNode.disconnect();
+        } catch (e) {}
+        delete activeNodes[synthId];
       }
     }
   } catch (err) {
@@ -701,6 +743,17 @@ export function stopSound(soundId: string) {
     } catch (e) {}
     delete activeNodes[soundId];
   }
+
+  // Also stop the procedural node keyed by its synth ID to prevent lingering synthetic tones
+  const synthId = getProceduralSynthId(soundId);
+  if (synthId && activeNodes[synthId]) {
+    const sNode = activeNodes[synthId];
+    if (sNode.updater) sNode.updater();
+    try {
+      sNode.gainNode.disconnect();
+    } catch (e) {}
+    delete activeNodes[synthId];
+  }
 }
 
 export function stopAllSounds() {
@@ -710,7 +763,12 @@ export function stopAllSounds() {
   });
   // Stop all Web Audio synthesis layers
   Object.keys(activeNodes).forEach(id => {
-    stopSound(id);
+    const sNode = activeNodes[id];
+    if (sNode.updater) sNode.updater();
+    try {
+      sNode.gainNode.disconnect();
+    } catch (e) {}
+    delete activeNodes[id];
   });
 }
 

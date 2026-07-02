@@ -3,6 +3,7 @@
 
 import { MixerTrack, SavedTrack } from '../types';
 import { getProceduralSynthId } from './audioSynth';
+import { getSoundById } from './noiseCatalog';
 
 // Formats an AudioBuffer into 16-bit stereo WAV container Blob
 export function audioBufferToWav(buffer: AudioBuffer): Blob {
@@ -207,6 +208,25 @@ export async function renderMixerTracksToWav(tracks: MixerTrack[], durationSecon
     channelGain.connect(masterGain);
 
     if (track.type === 'built-in' && track.soundId) {
+      const physicalSound = getSoundById(track.soundId);
+      let renderedPhysical = false;
+
+      if (physicalSound) {
+        const buffer = await fetchAndDecodeAudio(offlineCtx, physicalSound.url);
+        if (buffer) {
+          const source = offlineCtx.createBufferSource();
+          source.buffer = buffer;
+          source.loop = true;
+          source.connect(channelGain);
+          source.start(0);
+          renderedPhysical = true;
+        }
+      }
+
+      if (renderedPhysical) {
+        continue;
+      }
+
       const synthId = getProceduralSynthId(track.soundId);
       if (!synthId) continue;
 

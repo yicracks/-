@@ -41,26 +41,7 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
   isDark = false
 }) => {
   // Current stacked tracks in the mixer
-  const [mixerTracks, setMixerTracks] = useState<MixerTrack[]>([
-    {
-      id: 'init-rain',
-      type: 'built-in',
-      name: '林间淅淅微雨',
-      volume: 0.5,
-      speed: 1.0,
-      active: true,
-      soundId: 'rain-light-rain'
-    },
-    {
-      id: 'init-bowl',
-      type: 'built-in',
-      name: '佛照静心颂钵',
-      volume: 0.4,
-      speed: 1.0,
-      active: true,
-      soundId: 'things-singing-bowl'
-    }
-  ]);
+  const [mixerTracks, setMixerTracks] = useState<MixerTrack[]>([]);
 
   // Global trial/audible preview status
   const [isAudible, setIsAudible] = useState(false);
@@ -75,6 +56,28 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
 
   // Input states for 'tts' type
   const [ttsInput, setTtsInput] = useState('静静聆听这深夜的雨声，吸气，呼气，世界在这一刻安宁。');
+
+  // Active temporary preview sound ID (when selecting built-in ASMR)
+  const [tempPreviewId, setTempPreviewId] = useState<string | null>(null);
+
+  const handleSelectASMR = (soundId: string) => {
+    setSelectedASMRId(soundId);
+    setTempPreviewId(soundId);
+    setIsAudible(true);
+  };
+
+  const handleCancelAddTrack = () => {
+    setTempPreviewId(null);
+    setShowAddForm(false);
+    setShowOptions(false);
+  };
+
+  // Clear temporary built-in sound preview if they switch to other track categories
+  useEffect(() => {
+    if (newTrackType !== 'built-in' || !showAddForm) {
+      setTempPreviewId(null);
+    }
+  }, [newTrackType, showAddForm]);
 
   // Input states for 'mic' type
   const [isRecording, setIsRecording] = useState(false);
@@ -136,9 +139,14 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
       // Stop all builtins first, then set volumes for active ones
       AVAILABLE_ASMR_SOUNDS.forEach(asmr => {
         const correspondingTracks = mixerTracks.filter(t => t.active && t.type === 'built-in' && t.soundId === asmr.id);
-        if (correspondingTracks.length > 0) {
-          // Sum or use highest volume
-          const maxVol = Math.max(...correspondingTracks.map(t => t.volume));
+        const isCurrentlyPreviewed = asmr.id === tempPreviewId;
+        
+        if (correspondingTracks.length > 0 || isCurrentlyPreviewed) {
+          // Sum or use highest volume, or 0.6 default preview volume
+          const maxVol = Math.max(
+            ...correspondingTracks.map(t => t.volume),
+            isCurrentlyPreviewed ? 0.6 : 0
+          );
           setSoundVolume(asmr.id, maxVol);
         } else {
           setSoundVolume(asmr.id, 0); // Mute
@@ -180,7 +188,7 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
       // stop all live playback
       stopAllPlayingAudio();
     }
-  }, [isAudible, mixerTracks]);
+  }, [isAudible, mixerTracks, tempPreviewId]);
 
   // Handle active TTS tracks looping inside Master Audio Preview (isAudible)
   useEffect(() => {
@@ -469,12 +477,14 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
     setMixerTracks(prev => [...prev, newTrackItem]);
     
     // Reset specific states
+    setTempPreviewId(null);
     setTtsInput('静静聆听这深夜的雨声，吸气，呼气，世界在这一刻安宁。');
     setRecordedUrl(null);
     setRecordedBlob(null);
     setRecordDuration(0);
     setImportedFile(null);
     setShowAddForm(false);
+    setShowOptions(false);
   };
 
   // Play a single TTS sentence preview
@@ -631,15 +641,15 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
         <div className="space-y-1">
           <h2 className="text-base font-bold tracking-tight flex items-center gap-2">
             <Sliders className="text-amber-600" size={18} />
-            白噪音多轨叠加与朗读录制
+            混音合成
           </h2>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="flex flex-col gap-6 max-w-3xl mx-auto w-full">
         
-        {/* Left 2 Columns: Stacked multi-tracks dashboard */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Top Section: Stacked multi-tracks dashboard */}
+        <div className="space-y-6">
           
           <div className={`border rounded-3xl p-6 space-y-5 shadow-sm transition-colors duration-300 ${
             isDark 
@@ -825,7 +835,7 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
 
         </div>
 
-        {/* Right 1 Column: Create Form and Save Block */}
+        {/* Bottom Section: Create Form Block (now cleanly stacked below the active custom tracks list!) */}
         <div className="space-y-6">
           <div className={`border rounded-3xl p-6 space-y-5 shadow-sm transition-colors duration-300 ${
             isDark 
@@ -845,7 +855,7 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                 >
                   <Plus size={24} strokeWidth={2.5} />
                 </button>
-                <span className="text-[10px] mt-4 text-stone-450 font-medium tracking-wide">添加新音轨叠加</span>
+                <span className="text-[10px] mt-4 text-stone-450 font-medium tracking-wide">添加新音轨</span>
               </div>
             ) : (
               <div className="space-y-4">
@@ -969,8 +979,8 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                               <button
                                 key={s.id}
                                 type="button"
-                                onClick={() => setSelectedASMRId(s.id)}
-                                className={`p-2.5 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                                onClick={() => handleSelectASMR(s.id)}
+                                className={`p-2.5 rounded-xl border text-center transition-all relative flex flex-col justify-center min-h-[46px] ${
                                   isSelected 
                                     ? isDark 
                                       ? 'bg-amber-950/40 border-amber-600/60 text-amber-200 font-semibold shadow-sm' 
@@ -981,7 +991,6 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                                 }`}
                               >
                                 <div className="text-[11px] font-bold">{s.name}</div>
-                                <div className="text-[8px] opacity-40 mt-1 font-mono truncate">{s.filename}</div>
                                 {isSelected && (
                                   <div className="absolute top-1.5 right-1.5 bg-amber-600 text-white p-0.5 rounded-full scale-75 animate-bounce">
                                     <Check size={8} strokeWidth={4} />
@@ -1114,10 +1123,7 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                     <div className="flex gap-2.5 pt-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          setShowAddForm(false);
-                          setShowOptions(false);
-                        }}
+                        onClick={handleCancelAddTrack}
                         className={`flex-1 py-2 rounded-xl text-[10px] font-bold ${
                           isDark 
                             ? 'bg-stone-800 hover:bg-stone-750 text-stone-300' 
@@ -1131,7 +1137,7 @@ const SoundMixer: React.FC<SoundMixerProps> = ({
                         onClick={handleConfirmAddTrack}
                         className="flex-1 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold shadow-sm border border-amber-500"
                       >
-                        确定叠加
+                        确定添加
                       </button>
                     </div>
                   </div>
